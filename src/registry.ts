@@ -20,7 +20,7 @@ const adapters: RuntimeAdapter[] = [];
  *
  * @example
  * ```ts
- * import { register } from "@tigor/telemetry-js";
+ * import { register } from "@tigorhutasuhut/telemetry-js";
  *
  * register({
  *   name: "deno",

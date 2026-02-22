@@ -1,4 +1,4 @@
-# @tigor/telemetry-js
+# @tigorhutasuhut/telemetry-js
 
 OpenTelemetry SDK setup abstraction for multiple runtimes. Initialise tracing, metrics, and logging with a single function call — the library auto-detects your runtime and wires up the correct providers, exporters, and processors.
 
@@ -11,7 +11,7 @@ Full auto-generated API docs are available on [GitHub Pages](https://tigorlazuar
 ## Install
 
 ```bash
-pnpm add @tigor/telemetry-js
+pnpm add @tigorhutasuhut/telemetry-js
 ```
 
 On Node.js (or compatible runtimes like Bun), install [pino](https://github.com/pinojs/pino) for structured JSON logging to stderr:
@@ -25,7 +25,7 @@ Pino is an optional peer dependency — the SDK falls back to a built-in formatt
 ## Quick Start — Node.js
 
 ```ts
-import { initSDK } from "@tigor/telemetry-js";
+import { initSDK } from "@tigorhutasuhut/telemetry-js";
 
 const sdk = initSDK({
   serviceName: "my-api",
@@ -41,7 +41,7 @@ process.on("SIGTERM", () => sdk.shutdown());
 ## Quick Start — Cloudflare Workers
 
 ```ts
-import { instrument } from "@tigor/telemetry-js";
+import { instrument } from "@tigorhutasuhut/telemetry-js";
 
 export default instrument({
   serviceName: "my-worker",
@@ -115,7 +115,7 @@ Log-trace correlation is automatic — `traceId` and `spanId` from the active sp
 Metrics are enabled automatically when a metrics endpoint resolves:
 
 ```ts
-import { initSDK, metrics } from "@tigor/telemetry-js";
+import { initSDK, metrics } from "@tigorhutasuhut/telemetry-js";
 
 const sdk = initSDK({
   serviceName: "my-api",
@@ -149,8 +149,8 @@ counter.add(1, { method: "GET" });
 Register a custom adapter for runtimes that aren't built-in:
 
 ```ts
-import { register, initSDK, noopLogger } from "@tigor/telemetry-js";
-import type { RuntimeAdapter } from "@tigor/telemetry-js";
+import { register, initSDK, noopLogger } from "@tigorhutasuhut/telemetry-js";
+import type { RuntimeAdapter } from "@tigorhutasuhut/telemetry-js";
 
 const denoAdapter: RuntimeAdapter = {
   name: "deno",

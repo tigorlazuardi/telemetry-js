@@ -1,5 +1,5 @@
 {
-  "name": "@tigor/telemetry-js",
+  "name": "@tigorhutasuhut/telemetry-js",
   "version": "0.1.2",
   "description": "OpenTelemetry SDK setup abstraction for multiple runtimes",
   "license": "Apache-2.0",

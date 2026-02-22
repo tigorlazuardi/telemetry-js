@@ -12,7 +12,7 @@ import type { SDKConfig, SDKResult } from "./types.js";
  *
  * @example
  * ```ts
- * import { initSDK } from "@tigor/telemetry-js";
+ * import { initSDK } from "@tigorhutasuhut/telemetry-js";
  *
  * const sdk = initSDK({
  *   serviceName: "my-api",

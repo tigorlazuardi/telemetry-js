@@ -72,11 +72,11 @@ function deriveTracerName(): string {
         callerLine.match(/at (.+):\d+:\d+/);
       if (fileMatch) {
         const filePath = fileMatch[1];
-        return filePath.split("/").pop() ?? "@tigor/telemetry-js";
+        return filePath.split("/").pop() ?? "@tigorhutasuhut/telemetry-js";
       }
     }
   }
-  return "@tigor/telemetry-js";
+  return "@tigorhutasuhut/telemetry-js";
 }
 
 /**
@@ -110,7 +110,7 @@ function resolveParentContext(parent?: Span | string) {
  *
  * @example
  * ```ts
- * import { withTrace } from "@tigor/telemetry-js";
+ * import { withTrace } from "@tigorhutasuhut/telemetry-js";
  *
  * // Named function — span name is "fetchUser"
  * const user = await withTrace(async function fetchUser(span) {

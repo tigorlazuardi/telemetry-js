@@ -128,7 +128,7 @@ const headerSetter: TextMapSetter<Headers> = {
  *
  * @example
  * ```ts
- * import { traceHandler } from "@tigor/telemetry-js";
+ * import { traceHandler } from "@tigorhutasuhut/telemetry-js";
  *
  * export async function handle({ event, resolve }) {
  *   return traceHandler(event.platform.ctx, event.request, {
@@ -207,7 +207,7 @@ export async function traceHandler(
  *
  * @example
  * ```ts
- * import { instrument } from "@tigor/telemetry-js";
+ * import { instrument } from "@tigorhutasuhut/telemetry-js";
  *
  * export default instrument({
  *   serviceName: "my-worker",

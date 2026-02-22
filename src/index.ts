@@ -1,11 +1,11 @@
 /**
  * @packageDocumentation
  *
- * `@tigor/telemetry-js` — OpenTelemetry SDK setup abstraction for multiple runtimes.
+ * `@tigorhutasuhut/telemetry-js` — OpenTelemetry SDK setup abstraction for multiple runtimes.
  *
  * @example
  * ```ts
- * import { initSDK } from "@tigor/telemetry-js";
+ * import { initSDK } from "@tigorhutasuhut/telemetry-js";
  *
  * const sdk = initSDK({ serviceName: "my-api" });
  * ```

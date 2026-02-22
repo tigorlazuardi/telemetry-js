@@ -163,7 +163,7 @@ async function resolveParentContext(
  *
  * @example
  * ```ts
- * import { instrumentWorkflow } from "@tigor/telemetry-js";
+ * import { instrumentWorkflow } from "@tigorhutasuhut/telemetry-js";
  *
  * @instrumentWorkflow({ serviceName: "my-workflow" })
  * export class MyWorkflow extends WorkflowEntrypoint {

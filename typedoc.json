@@ -5,6 +5,6 @@
   "excludePrivate": true,
   "excludeInternal": true,
   "readme": "README.md",
-  "name": "@tigor/telemetry-js",
+  "name": "@tigorhutasuhut/telemetry-js",
   "includeVersion": true
 }

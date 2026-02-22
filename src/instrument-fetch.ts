@@ -88,7 +88,7 @@ async function readLimitedBody(
  *
  * @example
  * ```ts
- * import { instrumentFetch } from "@tigor/telemetry-js";
+ * import { instrumentFetch } from "@tigorhutasuhut/telemetry-js";
  *
  * const tracedFetch = instrumentFetch(globalThis.fetch, { logger });
  * const res = await tracedFetch("https://api.example.com/data");

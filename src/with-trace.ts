@@ -126,6 +126,14 @@ function resolveParentContext(parent?: Span | string) {
  * ```
  */
 export function withTrace<T>(
+  fn: (span: Span) => T,
+  opts?: WithTraceOptions,
+): T;
+export function withTrace<T>(
+  fn: (span: Span) => Promise<T>,
+  opts?: WithTraceOptions,
+): Promise<T>;
+export function withTrace<T>(
   fn: (span: Span) => T | Promise<T>,
   opts?: WithTraceOptions,
 ): T | Promise<T> {

@@ -87,10 +87,10 @@ describe("instrument", () => {
   describe("fetch handler", () => {
     it("wraps fetch handler and creates a span", async () => {
       const originalFetch = vi.fn().mockResolvedValue(new Response("ok"));
-      const handler = instrument({
-        serviceName: "test-service",
-        handler: { fetch: originalFetch },
-      });
+      const handler = instrument(
+        { fetch: originalFetch },
+        { serviceName: "test-service" },
+      );
 
       const req = new Request("https://example.com/api/test");
       const ctx = createMockCtx();
@@ -111,10 +111,10 @@ describe("instrument", () => {
       const originalFetch = vi
         .fn()
         .mockResolvedValue(new Response("error", { status: 500 }));
-      const handler = instrument({
-        serviceName: "test-service",
-        handler: { fetch: originalFetch },
-      });
+      const handler = instrument(
+        { fetch: originalFetch },
+        { serviceName: "test-service" },
+      );
 
       const ctx = createMockCtx();
       await handler.fetch!(new Request("https://example.com/"), {}, ctx);
@@ -127,10 +127,10 @@ describe("instrument", () => {
     it("records exception on thrown error", async () => {
       const error = new Error("fetch failed");
       const originalFetch = vi.fn().mockRejectedValue(error);
-      const handler = instrument({
-        serviceName: "test-service",
-        handler: { fetch: originalFetch },
-      });
+      const handler = instrument(
+        { fetch: originalFetch },
+        { serviceName: "test-service" },
+      );
 
       const ctx = createMockCtx();
       await expect(
@@ -150,10 +150,10 @@ describe("instrument", () => {
   describe("scheduled handler", () => {
     it("wraps scheduled handler and creates a span", async () => {
       const originalScheduled = vi.fn().mockResolvedValue(undefined);
-      const handler = instrument({
-        serviceName: "test-service",
-        handler: { scheduled: originalScheduled },
-      });
+      const handler = instrument(
+        { scheduled: originalScheduled },
+        { serviceName: "test-service" },
+      );
 
       const controller = {
         scheduledTime: Date.now(),
@@ -172,10 +172,10 @@ describe("instrument", () => {
     it("records exception on thrown error", async () => {
       const error = new Error("scheduled failed");
       const originalScheduled = vi.fn().mockRejectedValue(error);
-      const handler = instrument({
-        serviceName: "test-service",
-        handler: { scheduled: originalScheduled },
-      });
+      const handler = instrument(
+        { scheduled: originalScheduled },
+        { serviceName: "test-service" },
+      );
 
       const controller = {
         scheduledTime: Date.now(),
@@ -197,10 +197,10 @@ describe("instrument", () => {
   describe("queue handler", () => {
     it("wraps queue handler and creates a span", async () => {
       const originalQueue = vi.fn().mockResolvedValue(undefined);
-      const handler = instrument({
-        serviceName: "test-service",
-        handler: { queue: originalQueue },
-      });
+      const handler = instrument(
+        { queue: originalQueue },
+        { serviceName: "test-service" },
+      );
 
       const batch = {
         queue: "my-queue",
@@ -229,10 +229,10 @@ describe("instrument", () => {
 
   describe("auto-init SDK", () => {
     it("initializes SDK on first call", async () => {
-      const handler = instrument({
-        serviceName: "auto-init-test",
-        handler: { fetch: vi.fn().mockResolvedValue(new Response("ok")) },
-      });
+      const handler = instrument(
+        { fetch: vi.fn().mockResolvedValue(new Response("ok")) },
+        { serviceName: "auto-init-test" },
+      );
 
       const ctx = createMockCtx();
       await handler.fetch!(new Request("https://example.com/"), {}, ctx);
@@ -246,10 +246,10 @@ describe("instrument", () => {
     });
 
     it("does not re-initialize SDK on subsequent calls", async () => {
-      const handler = instrument({
-        serviceName: "auto-init-test",
-        handler: { fetch: vi.fn().mockResolvedValue(new Response("ok")) },
-      });
+      const handler = instrument(
+        { fetch: vi.fn().mockResolvedValue(new Response("ok")) },
+        { serviceName: "auto-init-test" },
+      );
 
       const ctx = createMockCtx();
       await handler.fetch!(new Request("https://example.com/"), {}, ctx);
@@ -261,10 +261,10 @@ describe("instrument", () => {
 
   describe("handler passthrough", () => {
     it("does not wrap handlers that are not defined", () => {
-      const handler = instrument({
-        serviceName: "test-service",
-        handler: {},
-      });
+      const handler = instrument(
+        {},
+        { serviceName: "test-service" },
+      );
 
       expect(handler.fetch).toBeUndefined();
       expect(handler.scheduled).toBeUndefined();
@@ -274,10 +274,10 @@ describe("instrument", () => {
 
   describe("flush", () => {
     it("calls waitUntil with forceFlush promise", async () => {
-      const handler = instrument({
-        serviceName: "test-service",
-        handler: { fetch: vi.fn().mockResolvedValue(new Response("ok")) },
-      });
+      const handler = instrument(
+        { fetch: vi.fn().mockResolvedValue(new Response("ok")) },
+        { serviceName: "test-service" },
+      );
 
       const ctx = createMockCtx();
       await handler.fetch!(new Request("https://example.com/"), {}, ctx);
@@ -288,11 +288,10 @@ describe("instrument", () => {
     });
 
     it("forceFlush is called on each request", async () => {
-      const handler = instrument({
-        serviceName: "test-service",
-        exporterEndpoint: "https://otel.example.com",
-        handler: { fetch: vi.fn().mockResolvedValue(new Response("ok")) },
-      });
+      const handler = instrument(
+        { fetch: vi.fn().mockResolvedValue(new Response("ok")) },
+        { serviceName: "test-service", exporterEndpoint: "https://otel.example.com" },
+      );
 
       const ctx = createMockCtx();
       await handler.fetch!(new Request("https://example.com/"), {}, ctx);

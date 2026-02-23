@@ -67,14 +67,9 @@ interface ExportedHandler<Env = unknown> {
 }
 
 /**
- * Configuration for {@link instrument}. Extends {@link SDKConfig} (minus `runtime`)
- * with the Cloudflare Worker handler to wrap.
+ * Options for {@link instrument}. Extends {@link SDKConfig} (minus `runtime`).
  */
-export interface InstrumentConfig<Env = unknown>
-  extends Omit<SDKConfig, "runtime"> {
-  /** The original Cloudflare Worker `ExportedHandler` to instrument. */
-  handler: ExportedHandler<Env>;
-}
+export interface InstrumentOptions extends Omit<SDKConfig, "runtime"> {}
 
 let sdkResult: SDKResult | null = null;
 
@@ -202,7 +197,8 @@ export async function traceHandler(
  * Each incoming `fetch`, `scheduled`, or `queue` event is traced as a span.
  * Spans are flushed via `ctx.waitUntil` so they don't block the response.
  *
- * @param config - Worker handler and SDK configuration.
+ * @param handler - The original Cloudflare Worker `ExportedHandler` to instrument.
+ * @param opts - SDK configuration options.
  * @returns A new `ExportedHandler` that traces every event.
  *
  * @example
@@ -210,19 +206,17 @@ export async function traceHandler(
  * import { instrument } from "@tigorhutasuhut/telemetry-js";
  *
  * export default instrument({
- *   serviceName: "my-worker",
- *   handler: {
- *     async fetch(request, env, ctx) {
- *       return new Response("Hello");
- *     },
+ *   async fetch(request, env, ctx) {
+ *     return new Response("Hello");
  *   },
  * });
  * ```
  */
 export function instrument<Env = unknown>(
-  config: InstrumentConfig<Env>,
+  handler: ExportedHandler<Env>,
+  opts?: InstrumentOptions,
 ): ExportedHandler<Env> {
-  const { handler, ...sdkConfig } = config;
+  const sdkConfig = opts ?? {};
   const result: ExportedHandler<Env> = {};
 
   if (handler.fetch) {
@@ -234,7 +228,7 @@ export function instrument<Env = unknown>(
     ): Promise<Response> => {
       return traceHandler(ctx, request, {
         ...sdkConfig,
-        env: config.env || (env as Record<string, string | undefined>),
+        env: sdkConfig.env || (env as Record<string, string | undefined>),
         serviceName: sdkConfig.serviceName ?? "unknown",
         handler: () => originalFetch(request, env, ctx),
         onFlush: () => flush(),

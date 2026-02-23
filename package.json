@@ -27,6 +27,7 @@
     "url": "https://github.com/tigorlazuardi/telemetry-js.git"
   },
   "scripts": {
+    "prepublishOnly": "tsup",
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -44,16 +44,12 @@ process.on("SIGTERM", () => sdk.shutdown());
 import { instrument } from "@tigorhutasuhut/telemetry-js";
 
 export default instrument({
+  async fetch(request, env, ctx) {
+    return new Response("Hello from Workers!");
+  },
+}, {
   serviceName: "my-worker",
   exporterEndpoint: "https://otel.example.com",
-  env: {
-    OTEL_EXPORTER_OTLP_ENDPOINT: "https://otel.example.com",
-  },
-  handler: {
-    async fetch(request, env, ctx) {
-      return new Response("Hello from Workers!");
-    },
-  },
 });
 ```
 
@@ -132,7 +128,7 @@ counter.add(1, { method: "GET" });
 
 | Option                    | Type                     | Default        | Description                                    |
 | ------------------------- | ------------------------ | -------------- | ---------------------------------------------- |
-| `serviceName`             | `string`                 | **(required)** | Logical service name in every span             |
+| `serviceName`             | `string`                 | `"unknown"`    | Logical service name in every span             |
 | `runtime`                 | `RuntimeName`            | auto-detect    | `"node"`, `"cloudflare-worker"`, or custom     |
 | `exporterEndpoint`        | `string`                 | —              | Base OTLP endpoint; SDK appends `/v1/{signal}` |
 | `exporterHeaders`         | `Record<string, string>` | —              | Headers for OTLP requests (e.g. auth)          |

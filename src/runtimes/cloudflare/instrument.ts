@@ -14,6 +14,14 @@ import { initSDK } from "../../sdk.js";
 // Minimal CF types to avoid @cloudflare/workers-types dependency
 interface ExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
+  passThroughOnException(): void;
+  /** For compatibility with Wrangler 4.x. */
+  props: unknown;
+}
+
+/** Minimal context for {@link traceHandler} — only `waitUntil` is required. */
+interface MinimalContext {
+  waitUntil(promise: Promise<unknown>): void;
 }
 
 interface ScheduledController {
@@ -135,7 +143,7 @@ const headerSetter: TextMapSetter<Headers> = {
  * ```
  */
 export async function traceHandler(
-  ctx: ExecutionContext,
+  ctx: MinimalContext,
   request: Request,
   opts: TraceHandlerOptions,
 ): Promise<Response> {

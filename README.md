@@ -71,8 +71,8 @@ export const handle: Handle = async ({ event, resolve }) => {
   return traceHandler({
     serviceName: "my-sveltekit-app",
     exporterEndpoint: "https://otel.example.com",
-    context: event.platform!.ctx,
-    env: event.platform!.env,
+    context: event.platform?.ctx,
+    env: event.platform?.env ?? {},
     request: event.request,
     handler: () => resolve(event),
   });
@@ -83,7 +83,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 | Option    | Type                      | Required | Description                                          |
 | --------- | ------------------------- | -------- | ---------------------------------------------------- |
-| `context` | `MinimalExecutionContext` | Yes      | Execution context (only `waitUntil` is required)     |
+| `context` | `MinimalExecutionContext \| undefined` | Yes | Execution context (only `waitUntil` is required). Pass `undefined` during SSG/prerender. |
 | `env`     | `Record<string, string>`  | Yes      | Environment variable map forwarded to the SDK        |
 | `request` | `Request`                 | Yes      | The incoming request to trace                        |
 | `handler` | `() => T \| Promise<T>`  | Yes      | The handler to call inside the traced span           |

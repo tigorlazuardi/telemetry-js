@@ -97,8 +97,8 @@ function flush(): Promise<void> {
  * Options for {@link traceHandler}.
  */
 export interface TraceHandlerOptions<T = Response> extends InstrumentOptions {
-  /** Execution context — only `waitUntil` is required. */
-  context: MinimalExecutionContext;
+  /** Execution context — only `waitUntil` is required. Pass `undefined` during SSG/prerender. */
+  context: MinimalExecutionContext | undefined;
   /** Environment variable map forwarded to the SDK. */
   env: Record<string, string | undefined>;
   /** The incoming `Request` to trace. */
@@ -141,8 +141,8 @@ const headerSetter: TextMapSetter<Headers> = {
  * export async function handle({ event, resolve }) {
  *   return traceHandler({
  *     serviceName: "my-sveltekit-app",
- *     context: event.platform.ctx,
- *     env: event.platform.env,
+ *     context: event.platform?.ctx,
+ *     env: event.platform?.env ?? {},
  *     request: event.request,
  *     handler: () => resolve(event),
  *   });
@@ -206,7 +206,7 @@ export async function traceHandler<T = Response>(
     throw error;
   } finally {
     span?.end();
-    ctx.waitUntil(onFlush?.() ?? Promise.resolve());
+    ctx?.waitUntil(onFlush?.() ?? Promise.resolve());
   }
 }
 

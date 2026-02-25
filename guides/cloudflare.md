@@ -141,8 +141,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   return traceHandler({
     serviceName: "my-sveltekit-app",
-    context: event.platform!.ctx,
-    env: event.platform!.env,
+    context: event.platform?.ctx,
+    env: event.platform?.env ?? {},
     request: event.request,
     handler: () => resolve(event),
     onFlush: () => sdk.forceFlush(),
@@ -179,8 +179,8 @@ const telemetry: Handle = async ({ event, resolve }) => {
 
   return traceHandler({
     serviceName: "my-sveltekit-app",
-    context: event.platform!.ctx,
-    env: event.platform!.env,
+    context: event.platform?.ctx,
+    env: event.platform?.env ?? {},
     request: event.request,
     handler: () => resolve(event),
     onFlush: () => sdk.forceFlush(),

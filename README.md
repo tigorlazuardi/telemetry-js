@@ -1,5 +1,7 @@
 # @tigorhutasuhut/telemetry-js
 
+> **EXPERIMENTAL** — This library is under active development with minimal test coverage. It is intended for personal use and the API may change without notice.
+
 OpenTelemetry SDK setup abstraction for multiple runtimes. Initialise tracing, metrics, and logging with a single function call — the library auto-detects your runtime and wires up the correct providers, exporters, and processors.
 
 The SDK **never throws** — on any failure it returns a noop result so your application keeps running.

@@ -10,7 +10,7 @@ The SDK **never throws** — on any failure it returns a noop result so your app
 
 ## API Reference
 
-Full auto-generated API docs are available on [GitHub Pages](https://tigorlazuardi.github.io/telemetry/).
+Full auto-generated API docs are available on [GitHub Pages](https://tigorlazuardi.github.io/telemetry-js/).
 
 ## Install
 

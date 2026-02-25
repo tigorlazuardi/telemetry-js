@@ -57,6 +57,40 @@ export default instrument({
 });
 ```
 
+## `traceHandler` — Non-Standard Entrypoints
+
+For frameworks like SvelteKit on Cloudflare that don't use the standard `ExportedHandler` pattern, use `traceHandler` directly. It wraps a single request with a traced span and handles SDK initialization, W3C trace context propagation, and flushing.
+
+### SvelteKit (`src/hooks.server.ts`)
+
+```ts
+import { traceHandler } from "@tigorhutasuhut/telemetry-js";
+import type { Handle } from "@sveltejs/kit";
+
+export const handle: Handle = async ({ event, resolve }) => {
+  return traceHandler({
+    serviceName: "my-sveltekit-app",
+    exporterEndpoint: "https://otel.example.com",
+    context: event.platform!.ctx,
+    env: event.platform!.env,
+    request: event.request,
+    handler: () => resolve(event),
+  });
+};
+```
+
+`traceHandler` accepts all `InstrumentOptions` (same as `instrument()`) plus:
+
+| Option    | Type                      | Required | Description                                          |
+| --------- | ------------------------- | -------- | ---------------------------------------------------- |
+| `context` | `MinimalExecutionContext` | Yes      | Execution context (only `waitUntil` is required)     |
+| `env`     | `Record<string, string>`  | Yes      | Environment variable map forwarded to the SDK        |
+| `request` | `Request`                 | Yes      | The incoming request to trace                        |
+| `handler` | `() => T \| Promise<T>`  | Yes      | The handler to call inside the traced span           |
+| `onFlush` | `() => void`              | No       | Callback invoked via `ctx.waitUntil` after span ends |
+
+The return type matches whatever `handler` returns. When `handler` returns a `Response`, the SDK automatically sets `http.status_code`, marks 5xx as errors, and injects trace context into response headers.
+
 ## Endpoint Resolution
 
 The SDK resolves OTLP endpoints per signal (`traces`, `metrics`, `logs`) using this priority (highest first):

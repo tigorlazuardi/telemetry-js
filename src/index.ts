@@ -11,10 +11,10 @@
  * ```
  */
 
-export { initSDK } from "./sdk.js";
+export { initSDK, getResource } from "./sdk.js";
 export { register, resolve, getRegisteredAdapters } from "./registry.js";
 export { instrument, traceHandler } from "./runtimes/cloudflare/instrument.js";
-export type { InstrumentOptions, TraceHandlerOptions } from "./runtimes/cloudflare/instrument.js";
+export type { InstrumentOptions, TraceHandlerOptions, MinimalExecutionContext } from "./runtimes/cloudflare/instrument.js";
 export { instrumentWorkflow, injectTraceparent, extractTraceparent } from "./runtimes/cloudflare/workflow.js";
 export type { InstrumentWorkflowOptions } from "./runtimes/cloudflare/workflow.js";
 export { withTrace } from "./with-trace.js";
@@ -47,3 +47,6 @@ export type {
   Histogram,
   UpDownCounter,
 } from "@opentelemetry/api";
+
+// Resource re-exports
+export type { Resource } from "@opentelemetry/resources";

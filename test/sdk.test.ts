@@ -15,6 +15,7 @@ vi.mock("../src/registry.js", () => {
 
 vi.mock("../src/noop.js", () => ({
   noopSDKResult: () => ({
+    resource: { attributes: {} },
     provider: {},
     logger: { debug() {}, info() {}, warn() {}, error() {} },
     async shutdown() {},
@@ -38,6 +39,7 @@ describe("initSDK", () => {
     vi.clearAllMocks();
     const mockProvider = {};
     mockSetup.mockReturnValue({
+      resource: { attributes: {} },
       provider: mockProvider,
       logger: noopLogger,
       shutdown: vi.fn().mockResolvedValue(undefined),
@@ -80,6 +82,7 @@ describe("initSDK", () => {
   it("returns meterProvider when adapter provides it", () => {
     const mockMeterProvider = { forceFlush: vi.fn(), shutdown: vi.fn() };
     mockSetup.mockReturnValue({
+      resource: { attributes: {} },
       provider: {},
       meterProvider: mockMeterProvider,
       logger: noopLogger,

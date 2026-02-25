@@ -134,6 +134,7 @@ export const cloudflareWorkerAdapter: RuntimeAdapter = {
       for (const w of warnings) logger.warn(w);
 
       return {
+        resource,
         provider: provider
           ? (provider as unknown as TracerProvider)
           : trace.getTracerProvider(),

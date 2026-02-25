@@ -8,6 +8,7 @@ const { mockForceFlush } = vi.hoisted(() => ({
 vi.mock("../src/sdk.js", () => {
   return {
     initSDK: vi.fn().mockReturnValue({
+      resource: { attributes: {} },
       provider: {},
       meterProvider: {},
       logger: { debug() {}, info() {}, warn() {}, error() {} },
@@ -314,7 +315,10 @@ describe("traceHandler", () => {
     const ctx = createMockCtx();
     const request = new Request("https://example.com/api/test?q=1");
 
-    await traceHandler(ctx, request, {
+    await traceHandler({
+      context: ctx,
+      env: {},
+      request,
       serviceName: "test-service",
       handler: () => new Response("ok"),
     });
@@ -330,7 +334,10 @@ describe("traceHandler", () => {
     const ctx = createMockCtx();
     const request = new Request("https://example.com/");
 
-    await traceHandler(ctx, request, {
+    await traceHandler({
+      context: ctx,
+      env: {},
+      request,
       serviceName: "test-service",
       handler: () => new Response("error", { status: 503 }),
     });
@@ -346,7 +353,10 @@ describe("traceHandler", () => {
     const error = new Error("handler failed");
 
     await expect(
-      traceHandler(ctx, request, {
+      traceHandler({
+        context: ctx,
+        env: {},
+        request,
         serviceName: "test-service",
         handler: () => {
           throw error;
@@ -366,7 +376,10 @@ describe("traceHandler", () => {
     const ctx = createMockCtx();
     const onFlush = vi.fn().mockResolvedValue(undefined);
 
-    await traceHandler(ctx, new Request("https://example.com/"), {
+    await traceHandler({
+      context: ctx,
+      env: {},
+      request: new Request("https://example.com/"),
       serviceName: "test-service",
       handler: () => new Response("ok"),
       onFlush,
@@ -380,14 +393,13 @@ describe("traceHandler", () => {
   it("works without onFlush (no crash)", async () => {
     const ctx = createMockCtx();
 
-    const response = await traceHandler(
-      ctx,
-      new Request("https://example.com/"),
-      {
-        serviceName: "test-service",
-        handler: () => new Response("ok"),
-      },
-    );
+    const response = await traceHandler({
+      context: ctx,
+      env: {},
+      request: new Request("https://example.com/"),
+      serviceName: "test-service",
+      handler: () => new Response("ok"),
+    });
 
     expect(response).toBeInstanceOf(Response);
     expect(ctx.waitUntil).toHaveBeenCalled();
@@ -402,7 +414,10 @@ describe("traceHandler", () => {
       },
     });
 
-    await traceHandler(ctx, request, {
+    await traceHandler({
+      context: ctx,
+      env: {},
+      request,
       serviceName: "test-service",
       handler: () => new Response("ok"),
     });
@@ -420,7 +435,10 @@ describe("traceHandler", () => {
   it("injects trace context into response headers", async () => {
     const ctx = createMockCtx();
 
-    await traceHandler(ctx, new Request("https://example.com/"), {
+    await traceHandler({
+      context: ctx,
+      env: {},
+      request: new Request("https://example.com/"),
       serviceName: "test-service",
       handler: () => new Response("ok"),
     });

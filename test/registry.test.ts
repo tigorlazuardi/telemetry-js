@@ -20,6 +20,7 @@ vi.mock("../src/runtimes/cloudflare/worker.js", () => ({
 // Mock noop module
 vi.mock("../src/noop.js", () => ({
   noopSDKResult: () => ({
+    resource: { attributes: {} },
     provider: {},
     logger: { debug() {}, info() {}, warn() {}, error() {} },
     async shutdown() {},
@@ -69,6 +70,7 @@ describe("registry", () => {
       name: "custom",
       detect: () => true,
       setup: vi.fn().mockReturnValue({
+        resource: { attributes: {} },
         provider: {},
         logger: { debug() {}, info() {}, warn() {}, error() {} },
         shutdown: vi.fn(),

@@ -20,7 +20,7 @@ interface ExecutionContext {
 }
 
 /** Minimal context for {@link traceHandler} — only `waitUntil` is required. */
-interface MinimalContext {
+export interface MinimalExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
 }
 
@@ -77,7 +77,7 @@ interface ExportedHandler<Env = unknown> {
 /**
  * Options for {@link instrument}. Extends {@link SDKConfig} (minus `runtime`).
  */
-export interface InstrumentOptions extends Omit<SDKConfig, "runtime"> {}
+export interface InstrumentOptions extends Omit<SDKConfig, "runtime"> { }
 
 let sdkResult: SDKResult | null = null;
 
@@ -96,12 +96,17 @@ function flush(): Promise<void> {
 /**
  * Options for {@link traceHandler}.
  */
-export interface TraceHandlerOptions
-  extends Omit<SDKConfig, "runtime" | "instrumentations"> {
+export interface TraceHandlerOptions<T = Response> extends InstrumentOptions {
+  /** Execution context — only `waitUntil` is required. */
+  context: MinimalExecutionContext;
+  /** Environment variable map forwarded to the SDK. */
+  env: Record<string, string | undefined>;
+  /** The incoming `Request` to trace. */
+  request: Request;
   /** The handler to call inside the traced span. */
-  handler: () => Response | Promise<Response>;
+  handler: () => T | Promise<T>;
   /** Optional callback invoked via `ctx.waitUntil` after the span ends. */
-  onFlush?: () => Promise<void>;
+  onFlush?: () => void;
 }
 
 const headerGetter: TextMapGetter<Headers> = {
@@ -134,21 +139,21 @@ const headerSetter: TextMapSetter<Headers> = {
  * import { traceHandler } from "@tigorhutasuhut/telemetry-js";
  *
  * export async function handle({ event, resolve }) {
- *   return traceHandler(event.platform.ctx, event.request, {
+ *   return traceHandler({
  *     serviceName: "my-sveltekit-app",
+ *     context: event.platform.ctx,
  *     env: event.platform.env,
+ *     request: event.request,
  *     handler: () => resolve(event),
  *   });
  * }
  * ```
  */
-export async function traceHandler(
-  ctx: MinimalContext,
-  request: Request,
-  opts: TraceHandlerOptions,
-): Promise<Response> {
-  const { handler, onFlush, ...sdkOpts } = opts;
-  ensureSDK(sdkOpts);
+export async function traceHandler<T = Response>(
+  opts: TraceHandlerOptions<T>,
+): Promise<T> {
+  const { context: ctx, env, request, handler, onFlush, ...sdkOpts } = opts;
+  ensureSDK({ ...sdkOpts, env });
   const tracer = trace.getTracer(opts.serviceName ?? "unknown");
   const url = new URL(request.url);
   const extractedCtx = propagation.extract(
@@ -159,7 +164,7 @@ export async function traceHandler(
   let span: Span | undefined;
 
   try {
-    const response = await tracer.startActiveSpan(
+    const result = await tracer.startActiveSpan(
       `${request.method} ${url.pathname}`,
       {
         kind: SpanKind.SERVER,
@@ -174,18 +179,24 @@ export async function traceHandler(
       async (s) => {
         span = s;
         const res = await handler();
-        span.setAttribute("http.status_code", res.status);
-        if (res.status >= 500) {
-          span.setStatus({ code: SpanStatusCode.ERROR });
+        if (res instanceof Response) {
+          span.setAttribute("http.status_code", res.status);
+          if (res.status >= 500) {
+            span.setStatus({ code: SpanStatusCode.ERROR });
+          }
         }
         return res;
       },
     );
 
-    // Inject trace context into response headers
-    const newResponse = new Response(response.body, response);
-    propagation.inject(context.active(), newResponse.headers, headerSetter);
-    return newResponse;
+    // Inject trace context into response headers when the result is a Response
+    if (result instanceof Response) {
+      const newResponse = new Response(result.body, result);
+      propagation.inject(context.active(), newResponse.headers, headerSetter);
+      return newResponse as T;
+    }
+
+    return result;
   } catch (error) {
     span?.setStatus({
       code: SpanStatusCode.ERROR,
@@ -234,9 +245,12 @@ export function instrument<Env = unknown>(
       env: Env,
       ctx: ExecutionContext,
     ): Promise<Response> => {
-      return traceHandler(ctx, request, {
+      const ee = sdkConfig.env || env || {}
+      return traceHandler({
         ...sdkConfig,
-        env: sdkConfig.env || (env as Record<string, string | undefined>),
+        context: ctx,
+        env: ee,
+        request,
         serviceName: sdkConfig.serviceName ?? "unknown",
         handler: () => originalFetch(request, env, ctx),
         onFlush: () => flush(),

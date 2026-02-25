@@ -57,20 +57,24 @@ export default instrument({
 A standalone function for frameworks that give you a `Request` + `ExecutionContext` but not the full `ExportedHandler` pattern — most commonly **SvelteKit on Cloudflare Pages**.
 
 ```ts
-function traceHandler(
-  ctx: ExecutionContext,
-  request: Request,
-  opts: TraceHandlerOptions,
-): Promise<Response>;
+function traceHandler<T = Response>(
+  opts: TraceHandlerOptions<T>,
+): Promise<T>;
 ```
 
-### `TraceHandlerOptions`
+### `TraceHandlerOptions<T>`
+
+Extends [`InstrumentOptions`](#configuration) (all SDK config fields) plus:
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
-| `serviceName` | `string` | Yes | OpenTelemetry service name |
-| `handler` | `() => Response \| Promise<Response>` | Yes | The handler to call inside the traced span |
-| `onFlush` | `() => Promise<void>` | No | Called via `ctx.waitUntil` after the span ends (e.g. to flush the SDK) |
+| `context` | `MinimalExecutionContext` | Yes | Execution context — only `waitUntil` is required |
+| `env` | `Record<string, string \| undefined>` | Yes | Environment variable map forwarded to the SDK |
+| `request` | `Request` | Yes | The incoming `Request` to trace |
+| `handler` | `() => T \| Promise<T>` | Yes | The handler to call inside the traced span |
+| `onFlush` | `() => void` | No | Called via `ctx.waitUntil` after the span ends (e.g. to flush the SDK) |
+
+When `handler` returns a `Response`, the SDK automatically sets `http.status_code`, marks 5xx as errors, and injects trace context into response headers. For non-`Response` return types, only the span lifecycle and error handling apply.
 
 ---
 
@@ -135,8 +139,11 @@ import { ensureTelemetry } from "$lib/server/telemetry";
 export const handle: Handle = async ({ event, resolve }) => {
   const sdk = ensureTelemetry();
 
-  return traceHandler(event.platform!.ctx, event.request, {
+  return traceHandler({
     serviceName: "my-sveltekit-app",
+    context: event.platform!.ctx,
+    env: event.platform!.env,
+    request: event.request,
     handler: () => resolve(event),
     onFlush: () => sdk.forceFlush(),
   });
@@ -170,8 +177,11 @@ import { ensureTelemetry } from "$lib/server/telemetry";
 const telemetry: Handle = async ({ event, resolve }) => {
   const sdk = ensureTelemetry();
 
-  return traceHandler(event.platform!.ctx, event.request, {
+  return traceHandler({
     serviceName: "my-sveltekit-app",
+    context: event.platform!.ctx,
+    env: event.platform!.env,
+    request: event.request,
     handler: () => resolve(event),
     onFlush: () => sdk.forceFlush(),
   });

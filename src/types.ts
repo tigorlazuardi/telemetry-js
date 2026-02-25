@@ -1,5 +1,6 @@
 import type { MeterProvider, SpanContext, TracerProvider } from "@opentelemetry/api";
 import type { LoggerProvider } from "@opentelemetry/api-logs";
+import type { Resource } from "@opentelemetry/resources";
 
 /**
  * Supported runtime identifiers.
@@ -110,6 +111,9 @@ export type OtlpSignal = "traces" | "metrics" | "logs";
  * The object returned by {@link initSDK} after the SDK has been initialised.
  */
 export interface SDKResult {
+  /** The merged OpenTelemetry {@link Resource} used by all providers. */
+  resource: Resource;
+
   /** The active `TracerProvider`. */
   provider: TracerProvider;
 

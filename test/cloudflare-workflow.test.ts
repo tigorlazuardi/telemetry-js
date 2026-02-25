@@ -4,6 +4,7 @@ import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 // Mock initSDK
 vi.mock("../src/sdk.js", () => ({
   initSDK: vi.fn().mockReturnValue({
+    resource: { attributes: {} },
     provider: {},
     meterProvider: {},
     logger: { debug() {}, info() {}, warn() {}, error() {} },

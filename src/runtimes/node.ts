@@ -80,6 +80,7 @@ export const nodeAdapter: RuntimeAdapter = {
       for (const w of warnings) logger.warn(w);
 
       return {
+        resource,
         provider: trace.getTracerProvider(),
         meterProvider: metricsEndpoint ? metrics.getMeterProvider() : undefined,
         loggerProvider: logsEndpoint ? logs.getLoggerProvider() : undefined,

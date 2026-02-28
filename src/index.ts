@@ -24,7 +24,7 @@ export type { TracedInput, TracedCallContext } from "./traced.js";
 export { resolveSignalEndpoint, normalizeEndpoint } from "./endpoints.js";
 export { instrumentFetch } from "./instrument-fetch.js";
 export type { InstrumentFetchConfig } from "./instrument-fetch.js";
-export { createLogger } from "./logger.js";
+export { createLogger, getLogger, runWithLogger, setDefaultLogger } from "./logger.js";
 export { noopSDKResult, noopLogger } from "./noop.js";
 export type {
   RuntimeName,

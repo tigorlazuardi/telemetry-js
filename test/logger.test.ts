@@ -27,7 +27,8 @@ vi.mock("@opentelemetry/api", () => ({
   },
 }));
 
-import { createLogger } from "../src/logger.js";
+import { createLogger, getLogger, runWithLogger, setDefaultLogger } from "../src/logger.js";
+import { noopLogger } from "../src/noop.js";
 
 describe("createLogger", () => {
   let stderrSpy: ReturnType<typeof vi.spyOn>;
@@ -40,6 +41,8 @@ describe("createLogger", () => {
       traceId: "00000000000000000000000000000000",
       spanId: "0000000000000000",
     });
+    // Reset default logger so tests are isolated
+    setDefaultLogger(undefined as never);
   });
 
   afterEach(() => {
@@ -81,6 +84,35 @@ describe("createLogger", () => {
       const logger = createLogger("test-service");
       logger.error("error msg");
       expect(stderrSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("optional serviceName", () => {
+    it("creates a logger without serviceName", () => {
+      const logger = createLogger();
+      logger.info("no service");
+      expect(stderrSpy).toHaveBeenCalled();
+      const output = stderrSpy.mock.calls[0][0] as string;
+      expect(output).toContain("no service");
+    });
+
+    it("omits service field from JSON when no serviceName", () => {
+      const logger = createLogger();
+      logger.info("no svc");
+      const output = stderrSpy.mock.calls[0][0] as string;
+      const parsed = JSON.parse(output.trim());
+      expect(parsed.service).toBeUndefined();
+      expect(parsed.msg).toBe("no svc");
+    });
+
+    it("includes service name in JSON when serviceName provided", () => {
+      const logger = createLogger("my-svc");
+      logger.info("with svc");
+      const output = stderrSpy.mock.calls[0][0] as string;
+      const parsed = JSON.parse(output.trim());
+      // pino uses `name`, built-in uses `service`
+      const svc = parsed.service ?? parsed.name;
+      expect(svc).toBe("my-svc");
     });
   });
 
@@ -186,6 +218,93 @@ describe("createLogger", () => {
       const logger = createLogger("test-service");
       expect(() => logger.info("")).not.toThrow();
       expect(() => logger.info(null as unknown as string)).not.toThrow();
+    });
+  });
+});
+
+describe("getLogger", () => {
+  let stderrSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    // Reset default logger so tests are isolated
+    setDefaultLogger(undefined as never);
+  });
+
+  afterEach(() => {
+    stderrSpy.mockRestore();
+  });
+
+  it("returns a working logger when nothing is configured", () => {
+    const logger = getLogger();
+    expect(typeof logger.info).toBe("function");
+    logger.info("fallback");
+    expect(stderrSpy).toHaveBeenCalled();
+  });
+
+  it("returns the default logger set via setDefaultLogger", () => {
+    const custom = createLogger("default-svc");
+    setDefaultLogger(custom);
+    const logger = getLogger();
+    expect(logger).toBe(custom);
+  });
+
+  it("returns the context-scoped logger inside runWithLogger", () => {
+    const outer = createLogger("outer");
+    const inner = createLogger("inner");
+
+    setDefaultLogger(outer);
+
+    runWithLogger(inner, () => {
+      expect(getLogger()).toBe(inner);
+    });
+
+    // Outside the runWithLogger scope, falls back to default
+    expect(getLogger()).toBe(outer);
+  });
+
+  it("context-scoped logger takes precedence over default", () => {
+    const defaultLogger = createLogger("default");
+    const scopedLogger = createLogger("scoped");
+    setDefaultLogger(defaultLogger);
+
+    runWithLogger(scopedLogger, () => {
+      const logger = getLogger();
+      expect(logger).toBe(scopedLogger);
+      expect(logger).not.toBe(defaultLogger);
+    });
+  });
+
+  it("nested runWithLogger scopes work correctly", () => {
+    const a = createLogger("a");
+    const b = createLogger("b");
+
+    runWithLogger(a, () => {
+      expect(getLogger()).toBe(a);
+
+      runWithLogger(b, () => {
+        expect(getLogger()).toBe(b);
+      });
+
+      // After inner scope exits, reverts to outer
+      expect(getLogger()).toBe(a);
+    });
+  });
+
+  it("runWithLogger works with async functions", async () => {
+    const custom = createLogger("async-svc");
+
+    await runWithLogger(custom, async () => {
+      // Simulate async work
+      await new Promise((r) => setTimeout(r, 10));
+      expect(getLogger()).toBe(custom);
+    });
+  });
+
+  it("can use noopLogger as the context-scoped logger", () => {
+    runWithLogger(noopLogger, () => {
+      expect(getLogger()).toBe(noopLogger);
     });
   });
 });

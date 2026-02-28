@@ -15,7 +15,7 @@ import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { detectNode } from "../detect.js";
 import { resolveSignalEndpoint } from "../endpoints.js";
-import { createLogger } from "../logger.js";
+import { createLogger, setDefaultLogger } from "../logger.js";
 import { noopSDKResult } from "../noop.js";
 import { buildResource } from "../resource.js";
 import type { RuntimeAdapter, SDKConfig, SDKResult } from "../types.js";
@@ -77,6 +77,7 @@ export const nodeAdapter: RuntimeAdapter = {
       sdk.start();
 
       const logger = createLogger(resolvedServiceName);
+      setDefaultLogger(logger);
       for (const w of warnings) logger.warn(w);
 
       return {

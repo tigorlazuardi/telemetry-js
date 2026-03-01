@@ -1,15 +1,15 @@
 import {
 	context,
 	propagation,
+	type Span,
 	SpanKind,
 	SpanStatusCode,
-	trace,
-	type Span,
 	type TextMapGetter,
 	type TextMapSetter,
+	trace,
 } from "@opentelemetry/api";
-import type { SDKConfig, SDKResult } from "../../types.js";
 import { initSDK } from "../../sdk.js";
+import type { SDKConfig, SDKResult } from "../../types.js";
 
 // Minimal CF types to avoid @cloudflare/workers-types dependency
 interface ExecutionContext {

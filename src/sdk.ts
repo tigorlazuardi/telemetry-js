@@ -1,6 +1,6 @@
 import type { Resource } from "@opentelemetry/resources";
-import { resolve } from "./registry.js";
 import { noopSDKResult } from "./noop.js";
+import { resolve } from "./registry.js";
 import type { SDKConfig, SDKResult } from "./types.js";
 
 /** Module-level reference to the last initialised resource. */
@@ -25,14 +25,14 @@ let _globalResource: Resource | null = null;
  * ```
  */
 export function initSDK(config: SDKConfig): SDKResult {
-  try {
-    const adapter = resolve(config.runtime);
-    const result = adapter.setup(config);
-    _globalResource = result.resource;
-    return result;
-  } catch {
-    return noopSDKResult();
-  }
+	try {
+		const adapter = resolve(config.runtime);
+		const result = adapter.setup(config);
+		_globalResource = result.resource;
+		return result;
+	} catch {
+		return noopSDKResult();
+	}
 }
 
 /**
@@ -40,5 +40,5 @@ export function initSDK(config: SDKConfig): SDKResult {
  * or `null` if the SDK has not been initialised yet.
  */
 export function getResource(): Resource | null {
-  return _globalResource;
+	return _globalResource;
 }

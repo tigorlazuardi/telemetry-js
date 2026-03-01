@@ -1,30 +1,30 @@
 import {
-  type Span,
-  SpanKind,
-  SpanStatusCode,
-  context,
-  propagation,
-  trace,
-  ROOT_CONTEXT,
+	context,
+	propagation,
+	ROOT_CONTEXT,
+	type Span,
+	SpanKind,
+	SpanStatusCode,
+	trace,
 } from "@opentelemetry/api";
 
 /**
  * Options for {@link withTrace}.
  */
 export interface WithTraceOptions {
-  /** Override auto-detected span name. */
-  name?: string;
-  /** Span kind (default: {@link SpanKind.INTERNAL}). */
-  kind?: SpanKind;
-  /** Initial span attributes. */
-  attributes?: Record<string, string>;
-  /**
-   * Parent context — either an existing {@link Span} or a W3C `traceparent`
-   * string (e.g. `"00-<traceId>-<spanId>-01"`).
-   *
-   * When omitted the current active context is inherited.
-   */
-  parent?: Span | string;
+	/** Override auto-detected span name. */
+	name?: string;
+	/** Span kind (default: {@link SpanKind.INTERNAL}). */
+	kind?: SpanKind;
+	/** Initial span attributes. */
+	attributes?: Record<string, string>;
+	/**
+	 * Parent context — either an existing {@link Span} or a W3C `traceparent`
+	 * string (e.g. `"00-<traceId>-<spanId>-01"`).
+	 *
+	 * When omitted the current active context is inherited.
+	 */
+	parent?: Span | string;
 }
 
 /**
@@ -36,61 +36,60 @@ export interface WithTraceOptions {
  * 3. Fallback `"anonymous"`
  */
 function deriveSpanName(fn: (...args: never[]) => unknown): string {
-  if (fn.name) return fn.name;
+	if (fn.name) return fn.name;
 
-  const stack = new Error().stack;
-  if (stack) {
-    const lines = stack.split("\n");
-    // Skip Error line, deriveSpanName frame, withTrace frame → caller is at index 3
-    const callerLine = lines[3]?.trim();
-    if (callerLine) {
-      // Match "at <file>:<line>:<col>" or "at <name> (<file>:<line>:<col>)"
-      const fileMatch = callerLine.match(/\((.+):(\d+):\d+\)/) ??
-        callerLine.match(/at (.+):(\d+):\d+/);
-      if (fileMatch) {
-        const filePath = fileMatch[1];
-        const line = fileMatch[2];
-        const fileName = filePath.split("/").pop() ?? filePath;
-        return `${fileName}:${line}`;
-      }
-    }
-  }
+	const stack = new Error().stack;
+	if (stack) {
+		const lines = stack.split("\n");
+		// Skip Error line, deriveSpanName frame, withTrace frame → caller is at index 3
+		const callerLine = lines[3]?.trim();
+		if (callerLine) {
+			// Match "at <file>:<line>:<col>" or "at <name> (<file>:<line>:<col>)"
+			const fileMatch =
+				callerLine.match(/\((.+):(\d+):\d+\)/) ?? callerLine.match(/at (.+):(\d+):\d+/);
+			if (fileMatch) {
+				const filePath = fileMatch[1];
+				const line = fileMatch[2];
+				const fileName = filePath.split("/").pop() ?? filePath;
+				return `${fileName}:${line}`;
+			}
+		}
+	}
 
-  return "anonymous";
+	return "anonymous";
 }
 
 /**
  * Derive a tracer name from the call-site file or fall back to the package name.
  */
 function deriveTracerName(): string {
-  const stack = new Error().stack;
-  if (stack) {
-    const lines = stack.split("\n");
-    const callerLine = lines[3]?.trim();
-    if (callerLine) {
-      const fileMatch = callerLine.match(/\((.+):\d+:\d+\)/) ??
-        callerLine.match(/at (.+):\d+:\d+/);
-      if (fileMatch) {
-        const filePath = fileMatch[1];
-        return filePath.split("/").pop() ?? "@tigorhutasuhut/telemetry-js";
-      }
-    }
-  }
-  return "@tigorhutasuhut/telemetry-js";
+	const stack = new Error().stack;
+	if (stack) {
+		const lines = stack.split("\n");
+		const callerLine = lines[3]?.trim();
+		if (callerLine) {
+			const fileMatch = callerLine.match(/\((.+):\d+:\d+\)/) ?? callerLine.match(/at (.+):\d+:\d+/);
+			if (fileMatch) {
+				const filePath = fileMatch[1];
+				return filePath.split("/").pop() ?? "@tigorhutasuhut/telemetry-js";
+			}
+		}
+	}
+	return "@tigorhutasuhut/telemetry-js";
 }
 
 /**
  * Build the parent context from the `parent` option.
  */
 function resolveParentContext(parent?: Span | string) {
-  if (!parent) return context.active();
+	if (!parent) return context.active();
 
-  if (typeof parent === "string") {
-    return propagation.extract(ROOT_CONTEXT, { traceparent: parent });
-  }
+	if (typeof parent === "string") {
+		return propagation.extract(ROOT_CONTEXT, { traceparent: parent });
+	}
 
-  // parent is a Span
-  return trace.setSpan(context.active(), parent);
+	// parent is a Span
+	return trace.setSpan(context.active(), parent);
 }
 
 /**
@@ -125,64 +124,58 @@ function resolveParentContext(parent?: Span | string) {
  * );
  * ```
  */
+export function withTrace<T>(fn: (span: Span) => T, opts?: WithTraceOptions): T;
+export function withTrace<T>(fn: (span: Span) => Promise<T>, opts?: WithTraceOptions): Promise<T>;
 export function withTrace<T>(
-  fn: (span: Span) => T,
-  opts?: WithTraceOptions,
-): T;
-export function withTrace<T>(
-  fn: (span: Span) => Promise<T>,
-  opts?: WithTraceOptions,
-): Promise<T>;
-export function withTrace<T>(
-  fn: (span: Span) => T | Promise<T>,
-  opts?: WithTraceOptions,
+	fn: (span: Span) => T | Promise<T>,
+	opts?: WithTraceOptions,
 ): T | Promise<T> {
-  const spanName = opts?.name ?? deriveSpanName(fn);
-  const tracerName = deriveTracerName();
-  const tracer = trace.getTracer(tracerName);
-  const parentCtx = resolveParentContext(opts?.parent);
+	const spanName = opts?.name ?? deriveSpanName(fn);
+	const tracerName = deriveTracerName();
+	const tracer = trace.getTracer(tracerName);
+	const parentCtx = resolveParentContext(opts?.parent);
 
-  return tracer.startActiveSpan(
-    spanName,
-    {
-      kind: opts?.kind ?? SpanKind.INTERNAL,
-      ...(opts?.attributes ? { attributes: opts.attributes } : {}),
-    },
-    parentCtx,
-    (span: Span) => {
-      let result: T | Promise<T>;
-      try {
-        result = fn(span);
-      } catch (error) {
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: error instanceof Error ? error.message : String(error),
-        });
-        span.recordException(error as Error);
-        span.end();
-        throw error;
-      }
+	return tracer.startActiveSpan(
+		spanName,
+		{
+			kind: opts?.kind ?? SpanKind.INTERNAL,
+			...(opts?.attributes ? { attributes: opts.attributes } : {}),
+		},
+		parentCtx,
+		(span: Span) => {
+			let result: T | Promise<T>;
+			try {
+				result = fn(span);
+			} catch (error) {
+				span.setStatus({
+					code: SpanStatusCode.ERROR,
+					message: error instanceof Error ? error.message : String(error),
+				});
+				span.recordException(error as Error);
+				span.end();
+				throw error;
+			}
 
-      if (result instanceof Promise) {
-        return result.then(
-          (value) => {
-            span.end();
-            return value;
-          },
-          (error: unknown) => {
-            span.setStatus({
-              code: SpanStatusCode.ERROR,
-              message: error instanceof Error ? error.message : String(error),
-            });
-            span.recordException(error as Error);
-            span.end();
-            throw error;
-          },
-        ) as T | Promise<T>;
-      }
+			if (result instanceof Promise) {
+				return result.then(
+					(value) => {
+						span.end();
+						return value;
+					},
+					(error: unknown) => {
+						span.setStatus({
+							code: SpanStatusCode.ERROR,
+							message: error instanceof Error ? error.message : String(error),
+						});
+						span.recordException(error as Error);
+						span.end();
+						throw error;
+					},
+				) as T | Promise<T>;
+			}
 
-      span.end();
-      return result;
-    },
-  );
+			span.end();
+			return result;
+		},
+	);
 }

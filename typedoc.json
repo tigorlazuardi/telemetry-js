@@ -1,10 +1,10 @@
 {
-  "$schema": "https://typedoc.org/schema.json",
-  "entryPoints": ["./src/index.ts"],
-  "out": "docs",
-  "excludePrivate": true,
-  "excludeInternal": true,
-  "readme": "README.md",
-  "name": "@tigorhutasuhut/telemetry-js",
-  "includeVersion": true
+	"$schema": "https://typedoc.org/schema.json",
+	"entryPoints": ["./src/index.ts"],
+	"out": "docs",
+	"excludePrivate": true,
+	"excludeInternal": true,
+	"readme": "README.md",
+	"name": "@tigorhutasuhut/telemetry-js",
+	"includeVersion": true
 }

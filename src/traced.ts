@@ -1,19 +1,17 @@
-import { withTrace, type WithTraceOptions } from "./with-trace.js";
+import { type WithTraceOptions, withTrace } from "./with-trace.js";
 
 /** Context passed to the traced factory function at each method call. */
 export interface TracedCallContext {
-  /** Class name (from `this.constructor.name`). */
-  className: string;
-  /** Decorated method name. */
-  methodName: string;
-  /** Arguments passed to the method call. */
-  args: unknown[];
+	/** Class name (from `this.constructor.name`). */
+	className: string;
+	/** Decorated method name. */
+	methodName: string;
+	/** Arguments passed to the method call. */
+	args: unknown[];
 }
 
 /** Input for {@link traced} — static options or factory function. */
-export type TracedInput =
-  | WithTraceOptions
-  | ((ctx: TracedCallContext) => WithTraceOptions);
+export type TracedInput = WithTraceOptions | ((ctx: TracedCallContext) => WithTraceOptions);
 
 /**
  * TC39 Stage 3 method decorator that wraps the method body in a
@@ -42,29 +40,25 @@ export type TracedInput =
  * ```
  */
 export function traced(optsOrFactory?: TracedInput) {
-  return function <This, Args extends unknown[], Return>(
-    target: (this: This, ...args: Args) => Return,
-    context: ClassMethodDecoratorContext<
-      This,
-      (this: This, ...args: Args) => Return
-    >,
-  ): (this: This, ...args: Args) => Return {
-    const methodName = String(context.name);
+	return <This, Args extends unknown[], Return>(
+		target: (this: This, ...args: Args) => Return,
+		context: ClassMethodDecoratorContext<This, (this: This, ...args: Args) => Return>,
+	): ((this: This, ...args: Args) => Return) => {
+		const methodName = String(context.name);
 
-    return function (this: This, ...args: Args): Return {
-      const className =
-        (this as { constructor?: { name?: string } })?.constructor?.name ??
-        "unknown";
-      const defaultName = `${className}.${methodName}`;
+		return function (this: This, ...args: Args): Return {
+			const className =
+				(this as { constructor?: { name?: string } })?.constructor?.name ?? "unknown";
+			const defaultName = `${className}.${methodName}`;
 
-      const opts: WithTraceOptions =
-        typeof optsOrFactory === "function"
-          ? optsOrFactory({ className, methodName, args })
-          : { ...optsOrFactory };
+			const opts: WithTraceOptions =
+				typeof optsOrFactory === "function"
+					? optsOrFactory({ className, methodName, args })
+					: { ...optsOrFactory };
 
-      if (!opts.name) opts.name = defaultName;
+			if (!opts.name) opts.name = defaultName;
 
-      return withTrace(() => target.call(this, ...args), opts) as Return;
-    };
-  };
+			return withTrace(() => target.call(this, ...args), opts) as Return;
+		};
+	};
 }

@@ -9,7 +9,7 @@
 // `@opentelemetry/core` holds in `otperformance`.  Mutating it here
 // makes the fix visible everywhere.  In Node.js `timeOrigin` is already
 // a number, so the guard makes this a no-op.
-import { performance as _perfHooksPerf } from "perf_hooks";
+import { performance as _perfHooksPerf } from "node:perf_hooks";
 
 const _perf = _perfHooksPerf as unknown as Record<string, unknown>;
 if (_perf && typeof _perf.timeOrigin !== "number") {
@@ -81,13 +81,13 @@ class CloudflareContextManager implements ContextManager {
 
 	bind<T>(ctx: Context, target: T): T {
 		if (typeof target === "function") {
-			// eslint-disable-next-line @typescript-eslint/no-this-alias
 			const manager = this;
+			const fn = target as unknown as (...a: unknown[]) => unknown;
 			const bound = function (this: unknown, ...args: unknown[]) {
-				return manager.with(ctx, () => (target as Function).apply(this, args));
+				return manager.with(ctx, () => fn.apply(this, args));
 			};
 			Object.defineProperty(bound, "length", {
-				value: (target as Function).length,
+				value: fn.length,
 				configurable: true,
 			});
 			return bound as unknown as T;

@@ -1,9 +1,9 @@
 import {
-  defaultResource,
-  detectResources,
-  resourceFromAttributes,
-  type Resource,
-  type ResourceDetector,
+	defaultResource,
+	detectResources,
+	type Resource,
+	type ResourceDetector,
+	resourceFromAttributes,
 } from "@opentelemetry/resources";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import type { SDKConfig } from "./types.js";
@@ -18,42 +18,42 @@ const ATTR_SERVICE_NAMESPACE = "service.namespace";
  * For Node the built-in `envDetector` already handles this.
  */
 export function parseEnvResourceAttributes(
-  env: Record<string, string | undefined>,
+	env: Record<string, string | undefined>,
 ): Record<string, string> {
-  const attrs: Record<string, string> = {};
+	const attrs: Record<string, string> = {};
 
-  const raw = env.OTEL_RESOURCE_ATTRIBUTES;
-  if (raw) {
-    for (const pair of raw.split(",")) {
-      const idx = pair.indexOf("=");
-      if (idx <= 0) continue;
-      const key = pair.slice(0, idx).trim();
-      const value = pair.slice(idx + 1).trim();
-      if (key) attrs[key] = decodeURIComponent(value);
-    }
-  }
+	const raw = env.OTEL_RESOURCE_ATTRIBUTES;
+	if (raw) {
+		for (const pair of raw.split(",")) {
+			const idx = pair.indexOf("=");
+			if (idx <= 0) continue;
+			const key = pair.slice(0, idx).trim();
+			const value = pair.slice(idx + 1).trim();
+			if (key) attrs[key] = decodeURIComponent(value);
+		}
+	}
 
-  // OTEL_SERVICE_NAME takes precedence over service.name in OTEL_RESOURCE_ATTRIBUTES
-  const serviceName = env.OTEL_SERVICE_NAME?.trim();
-  if (serviceName) {
-    attrs[ATTR_SERVICE_NAME] = serviceName;
-  }
+	// OTEL_SERVICE_NAME takes precedence over service.name in OTEL_RESOURCE_ATTRIBUTES
+	const serviceName = env.OTEL_SERVICE_NAME?.trim();
+	if (serviceName) {
+		attrs[ATTR_SERVICE_NAME] = serviceName;
+	}
 
-  return attrs;
+	return attrs;
 }
 
 /** Returns `true` when stderr is a TTY (Node only). */
 function isStderrTTY(): boolean {
-  try {
-    return typeof process !== "undefined" && !!process.stderr?.isTTY;
-  } catch {
-    return false;
-  }
+	try {
+		return typeof process !== "undefined" && !!process.stderr?.isTTY;
+	} catch {
+		return false;
+	}
 }
 
 export interface BuildResourceResult {
-  resource: Resource;
-  warnings: string[];
+	resource: Resource;
+	warnings: string[];
 }
 
 /**
@@ -70,77 +70,77 @@ export interface BuildResourceResult {
  * When stderr is a TTY, auto-sets `deployment.environment.name` and `service.namespace` to `"local"`.
  */
 export function buildResource(
-  config: SDKConfig,
-  runtimeDetectors: ResourceDetector[],
+	config: SDKConfig,
+	runtimeDetectors: ResourceDetector[],
 ): BuildResourceResult {
-  const warnings: string[] = [];
+	const warnings: string[] = [];
 
-  // 1. OTel default resource
-  const base = defaultResource();
+	// 1. OTel default resource
+	const base = defaultResource();
 
-  // 2. Config-provided resource
-  const configAttrs: Record<string, string> = { ...config.resourceAttributes };
-  if (config.serviceName != null) {
-    configAttrs[ATTR_SERVICE_NAME] = config.serviceName;
-  }
-  const configResource = resourceFromAttributes(configAttrs);
+	// 2. Config-provided resource
+	const configAttrs: Record<string, string> = { ...config.resourceAttributes };
+	if (config.serviceName != null) {
+		configAttrs[ATTR_SERVICE_NAME] = config.serviceName;
+	}
+	const configResource = resourceFromAttributes(configAttrs);
 
-  // 3. Runtime detectors (Node: envDetector parses process.env automatically; CF: [])
-  const detected = detectResources({ detectors: runtimeDetectors });
+	// 3. Runtime detectors (Node: envDetector parses process.env automatically; CF: [])
+	const detected = detectResources({ detectors: runtimeDetectors });
 
-  // 4. config.env overrides (Cloudflare Workers)
-  let envOverride: Resource | null = null;
-  if (config.env) {
-    const envAttrs = parseEnvResourceAttributes(config.env);
-    if (Object.keys(envAttrs).length > 0) {
-      envOverride = resourceFromAttributes(envAttrs);
-    }
-  }
+	// 4. config.env overrides (Cloudflare Workers)
+	let envOverride: Resource | null = null;
+	if (config.env) {
+		const envAttrs = parseEnvResourceAttributes(config.env);
+		if (Object.keys(envAttrs).length > 0) {
+			envOverride = resourceFromAttributes(envAttrs);
+		}
+	}
 
-  // Merge: later takes precedence
-  let resource = base.merge(configResource).merge(detected);
-  if (envOverride) {
-    resource = resource.merge(envOverride);
-  }
+	// Merge: later takes precedence
+	let resource = base.merge(configResource).merge(detected);
+	if (envOverride) {
+		resource = resource.merge(envOverride);
+	}
 
-  // --- Validation ---
-  const serviceName = resource.attributes[ATTR_SERVICE_NAME] as string | undefined;
-  const deployEnv = resource.attributes[ATTR_DEPLOYMENT_ENVIRONMENT_NAME] as string | undefined;
-  const serviceNs = resource.attributes[ATTR_SERVICE_NAMESPACE] as string | undefined;
+	// --- Validation ---
+	const serviceName = resource.attributes[ATTR_SERVICE_NAME] as string | undefined;
+	const deployEnv = resource.attributes[ATTR_DEPLOYMENT_ENVIRONMENT_NAME] as string | undefined;
+	const serviceNs = resource.attributes[ATTR_SERVICE_NAMESPACE] as string | undefined;
 
-  const tty = isStderrTTY();
+	const tty = isStderrTTY();
 
-  // TTY fallback for deployment.environment.name and service.namespace
-  const ttyAttrs: Record<string, string> = {};
-  if (!deployEnv && tty) {
-    ttyAttrs[ATTR_DEPLOYMENT_ENVIRONMENT_NAME] = "local";
-  }
-  if (!serviceNs && tty) {
-    ttyAttrs[ATTR_SERVICE_NAMESPACE] = "local";
-  }
-  if (Object.keys(ttyAttrs).length > 0) {
-    resource = resource.merge(resourceFromAttributes(ttyAttrs));
-  }
+	// TTY fallback for deployment.environment.name and service.namespace
+	const ttyAttrs: Record<string, string> = {};
+	if (!deployEnv && tty) {
+		ttyAttrs[ATTR_DEPLOYMENT_ENVIRONMENT_NAME] = "local";
+	}
+	if (!serviceNs && tty) {
+		ttyAttrs[ATTR_SERVICE_NAMESPACE] = "local";
+	}
+	if (Object.keys(ttyAttrs).length > 0) {
+		resource = resource.merge(resourceFromAttributes(ttyAttrs));
+	}
 
-  // Warnings
-  if (!serviceName || /^unknown_service/.test(serviceName)) {
-    const resolved = serviceName ?? "unknown";
-    warnings.push(
-      `service.name resolved to "${resolved}". Traces and logs will not be attributable to a specific service. To fix, set OTEL_SERVICE_NAME or pass serviceName in config. Example: OTEL_SERVICE_NAME=my-api`,
-    );
-  }
+	// Warnings
+	if (!serviceName || /^unknown_service/.test(serviceName)) {
+		const resolved = serviceName ?? "unknown";
+		warnings.push(
+			`service.name resolved to "${resolved}". Traces and logs will not be attributable to a specific service. To fix, set OTEL_SERVICE_NAME or pass serviceName in config. Example: OTEL_SERVICE_NAME=my-api`,
+		);
+	}
 
-  if (!resource.attributes[ATTR_DEPLOYMENT_ENVIRONMENT_NAME]) {
-    warnings.push(
-      "deployment.environment.name is not set. Logs and traces cannot be filtered by deployment environment. Set OTEL_RESOURCE_ATTRIBUTES to include it. Example: OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=production,service.namespace=my-team",
-    );
-  }
+	if (!resource.attributes[ATTR_DEPLOYMENT_ENVIRONMENT_NAME]) {
+		warnings.push(
+			"deployment.environment.name is not set. Logs and traces cannot be filtered by deployment environment. Set OTEL_RESOURCE_ATTRIBUTES to include it. Example: OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=production,service.namespace=my-team",
+		);
+	}
 
-  if (!resource.attributes[ATTR_SERVICE_NAMESPACE]) {
-    warnings.push(
-      "service.namespace is not set. Logs and traces cannot be filtered by namespace. Set OTEL_RESOURCE_ATTRIBUTES to include it. Example: OTEL_RESOURCE_ATTRIBUTES=service.namespace=my-team,deployment.environment.name=production",
-    );
-  }
+	if (!resource.attributes[ATTR_SERVICE_NAMESPACE]) {
+		warnings.push(
+			"service.namespace is not set. Logs and traces cannot be filtered by namespace. Set OTEL_RESOURCE_ATTRIBUTES to include it. Example: OTEL_RESOURCE_ATTRIBUTES=service.namespace=my-team,deployment.environment.name=production",
+		);
+	}
 
-  return { resource, warnings };
+	return { resource, warnings };
 }

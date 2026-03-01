@@ -1,310 +1,310 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock @opentelemetry/api-logs
 const mockEmit = vi.fn();
 vi.mock("@opentelemetry/api-logs", () => ({
-  logs: {
-    getLogger: () => ({ emit: mockEmit }),
-  },
-  SeverityNumber: {
-    DEBUG: 5,
-    INFO: 9,
-    WARN: 13,
-    ERROR: 17,
-  },
+	logs: {
+		getLogger: () => ({ emit: mockEmit }),
+	},
+	SeverityNumber: {
+		DEBUG: 5,
+		INFO: 9,
+		WARN: 13,
+		ERROR: 17,
+	},
 }));
 
 // Mock @opentelemetry/api to control span context
 const mockSpanContext = vi.fn().mockReturnValue({
-  traceId: "00000000000000000000000000000000",
-  spanId: "0000000000000000",
+	traceId: "00000000000000000000000000000000",
+	spanId: "0000000000000000",
 });
 vi.mock("@opentelemetry/api", () => ({
-  context: { active: () => ({}) },
-  trace: {
-    getSpan: () => ({ spanContext: mockSpanContext }),
-    setSpanContext: (_ctx: unknown, spanCtx: unknown) => spanCtx,
-  },
+	context: { active: () => ({}) },
+	trace: {
+		getSpan: () => ({ spanContext: mockSpanContext }),
+		setSpanContext: (_ctx: unknown, spanCtx: unknown) => spanCtx,
+	},
 }));
 
 import { createLogger, getLogger, runWithLogger, setDefaultLogger } from "../src/logger.js";
 import { noopLogger } from "../src/noop.js";
 
 describe("createLogger", () => {
-  let stderrSpy: ReturnType<typeof vi.spyOn>;
+	let stderrSpy: ReturnType<typeof vi.spyOn>;
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    // Reset span context to invalid (no active span)
-    mockSpanContext.mockReturnValue({
-      traceId: "00000000000000000000000000000000",
-      spanId: "0000000000000000",
-    });
-    // Reset default logger so tests are isolated
-    setDefaultLogger(undefined as never);
-  });
+	beforeEach(() => {
+		vi.clearAllMocks();
+		stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+		// Reset span context to invalid (no active span)
+		mockSpanContext.mockReturnValue({
+			traceId: "00000000000000000000000000000000",
+			spanId: "0000000000000000",
+		});
+		// Reset default logger so tests are isolated
+		setDefaultLogger(undefined as never);
+	});
 
-  afterEach(() => {
-    stderrSpy.mockRestore();
-  });
+	afterEach(() => {
+		stderrSpy.mockRestore();
+	});
 
-  describe("all log levels", () => {
-    it("logger has debug, info, warn, error methods", () => {
-      const logger = createLogger("test-service");
-      expect(typeof logger.debug).toBe("function");
-      expect(typeof logger.info).toBe("function");
-      expect(typeof logger.warn).toBe("function");
-      expect(typeof logger.error).toBe("function");
-    });
+	describe("all log levels", () => {
+		it("logger has debug, info, warn, error methods", () => {
+			const logger = createLogger("test-service");
+			expect(typeof logger.debug).toBe("function");
+			expect(typeof logger.info).toBe("function");
+			expect(typeof logger.warn).toBe("function");
+			expect(typeof logger.error).toBe("function");
+		});
 
-    it("info writes to stderr", () => {
-      const logger = createLogger("test-service");
-      logger.info("hello world");
-      expect(stderrSpy).toHaveBeenCalled();
-      const output = stderrSpy.mock.calls[0][0] as string;
-      expect(output).toContain("hello world");
-    });
+		it("info writes to stderr", () => {
+			const logger = createLogger("test-service");
+			logger.info("hello world");
+			expect(stderrSpy).toHaveBeenCalled();
+			const output = stderrSpy.mock.calls[0][0] as string;
+			expect(output).toContain("hello world");
+		});
 
-    it("debug writes to stderr", () => {
-      const logger = createLogger("test-service");
-      logger.debug("debug msg");
-      expect(stderrSpy).toHaveBeenCalled();
-      const output = stderrSpy.mock.calls[0][0] as string;
-      expect(output).toContain("debug msg");
-    });
+		it("debug writes to stderr", () => {
+			const logger = createLogger("test-service");
+			logger.debug("debug msg");
+			expect(stderrSpy).toHaveBeenCalled();
+			const output = stderrSpy.mock.calls[0][0] as string;
+			expect(output).toContain("debug msg");
+		});
 
-    it("warn writes to stderr", () => {
-      const logger = createLogger("test-service");
-      logger.warn("warn msg");
-      expect(stderrSpy).toHaveBeenCalled();
-    });
+		it("warn writes to stderr", () => {
+			const logger = createLogger("test-service");
+			logger.warn("warn msg");
+			expect(stderrSpy).toHaveBeenCalled();
+		});
 
-    it("error writes to stderr", () => {
-      const logger = createLogger("test-service");
-      logger.error("error msg");
-      expect(stderrSpy).toHaveBeenCalled();
-    });
-  });
+		it("error writes to stderr", () => {
+			const logger = createLogger("test-service");
+			logger.error("error msg");
+			expect(stderrSpy).toHaveBeenCalled();
+		});
+	});
 
-  describe("optional serviceName", () => {
-    it("creates a logger without serviceName", () => {
-      const logger = createLogger();
-      logger.info("no service");
-      expect(stderrSpy).toHaveBeenCalled();
-      const output = stderrSpy.mock.calls[0][0] as string;
-      expect(output).toContain("no service");
-    });
+	describe("optional serviceName", () => {
+		it("creates a logger without serviceName", () => {
+			const logger = createLogger();
+			logger.info("no service");
+			expect(stderrSpy).toHaveBeenCalled();
+			const output = stderrSpy.mock.calls[0][0] as string;
+			expect(output).toContain("no service");
+		});
 
-    it("omits service field from JSON when no serviceName", () => {
-      const logger = createLogger();
-      logger.info("no svc");
-      const output = stderrSpy.mock.calls[0][0] as string;
-      const parsed = JSON.parse(output.trim());
-      expect(parsed.service).toBeUndefined();
-      expect(parsed.msg).toBe("no svc");
-    });
+		it("omits service field from JSON when no serviceName", () => {
+			const logger = createLogger();
+			logger.info("no svc");
+			const output = stderrSpy.mock.calls[0][0] as string;
+			const parsed = JSON.parse(output.trim());
+			expect(parsed.service).toBeUndefined();
+			expect(parsed.msg).toBe("no svc");
+		});
 
-    it("includes service name in JSON when serviceName provided", () => {
-      const logger = createLogger("my-svc");
-      logger.info("with svc");
-      const output = stderrSpy.mock.calls[0][0] as string;
-      const parsed = JSON.parse(output.trim());
-      // pino uses `name`, built-in uses `service`
-      const svc = parsed.service ?? parsed.name;
-      expect(svc).toBe("my-svc");
-    });
-  });
+		it("includes service name in JSON when serviceName provided", () => {
+			const logger = createLogger("my-svc");
+			logger.info("with svc");
+			const output = stderrSpy.mock.calls[0][0] as string;
+			const parsed = JSON.parse(output.trim());
+			// pino uses `name`, built-in uses `service`
+			const svc = parsed.service ?? parsed.name;
+			expect(svc).toBe("my-svc");
+		});
+	});
 
-  describe("JSON output", () => {
-    it("outputs valid JSON to stderr", () => {
-      const logger = createLogger("test-service");
-      logger.info("json test");
-      const output = stderrSpy.mock.calls[0][0] as string;
-      const parsed = JSON.parse(output.trim());
-      // Works with both pino (msg) and built-in (msg) formats
-      expect(parsed.msg).toBe("json test");
-    });
+	describe("JSON output", () => {
+		it("outputs valid JSON to stderr", () => {
+			const logger = createLogger("test-service");
+			logger.info("json test");
+			const output = stderrSpy.mock.calls[0][0] as string;
+			const parsed = JSON.parse(output.trim());
+			// Works with both pino (msg) and built-in (msg) formats
+			expect(parsed.msg).toBe("json test");
+		});
 
-    it("includes attributes in output", () => {
-      const logger = createLogger("test-service");
-      logger.info("with attrs", { userId: "123", count: 42, active: true });
-      const output = stderrSpy.mock.calls[0][0] as string;
-      const parsed = JSON.parse(output.trim());
-      expect(parsed.userId).toBe("123");
-      expect(parsed.count).toBe(42);
-      expect(parsed.active).toBe(true);
-    });
-  });
+		it("includes attributes in output", () => {
+			const logger = createLogger("test-service");
+			logger.info("with attrs", { userId: "123", count: 42, active: true });
+			const output = stderrSpy.mock.calls[0][0] as string;
+			const parsed = JSON.parse(output.trim());
+			expect(parsed.userId).toBe("123");
+			expect(parsed.count).toBe(42);
+			expect(parsed.active).toBe(true);
+		});
+	});
 
-  describe("OTLP bridge", () => {
-    it("emits to OTLP logger on every call", () => {
-      const logger = createLogger("test-service");
-      logger.info("otlp test");
-      expect(mockEmit).toHaveBeenCalledWith(
-        expect.objectContaining({
-          severityNumber: 9,
-          severityText: "INFO",
-          body: "otlp test",
-        }),
-      );
-    });
+	describe("OTLP bridge", () => {
+		it("emits to OTLP logger on every call", () => {
+			const logger = createLogger("test-service");
+			logger.info("otlp test");
+			expect(mockEmit).toHaveBeenCalledWith(
+				expect.objectContaining({
+					severityNumber: 9,
+					severityText: "INFO",
+					body: "otlp test",
+				}),
+			);
+		});
 
-    it("emits correct severity for each level", () => {
-      const logger = createLogger("test-service");
+		it("emits correct severity for each level", () => {
+			const logger = createLogger("test-service");
 
-      logger.debug("d");
-      expect(mockEmit).toHaveBeenCalledWith(
-        expect.objectContaining({ severityNumber: 5, severityText: "DEBUG" }),
-      );
+			logger.debug("d");
+			expect(mockEmit).toHaveBeenCalledWith(
+				expect.objectContaining({ severityNumber: 5, severityText: "DEBUG" }),
+			);
 
-      logger.warn("w");
-      expect(mockEmit).toHaveBeenCalledWith(
-        expect.objectContaining({ severityNumber: 13, severityText: "WARN" }),
-      );
+			logger.warn("w");
+			expect(mockEmit).toHaveBeenCalledWith(
+				expect.objectContaining({ severityNumber: 13, severityText: "WARN" }),
+			);
 
-      logger.error("e");
-      expect(mockEmit).toHaveBeenCalledWith(
-        expect.objectContaining({ severityNumber: 17, severityText: "ERROR" }),
-      );
-    });
+			logger.error("e");
+			expect(mockEmit).toHaveBeenCalledWith(
+				expect.objectContaining({ severityNumber: 17, severityText: "ERROR" }),
+			);
+		});
 
-    it("passes attributes to OTLP emit", () => {
-      const logger = createLogger("test-service");
-      logger.warn("with attrs", { key: "value" });
-      expect(mockEmit).toHaveBeenCalledWith(
-        expect.objectContaining({
-          severityText: "WARN",
-          attributes: { key: "value" },
-        }),
-      );
-    });
-  });
+		it("passes attributes to OTLP emit", () => {
+			const logger = createLogger("test-service");
+			logger.warn("with attrs", { key: "value" });
+			expect(mockEmit).toHaveBeenCalledWith(
+				expect.objectContaining({
+					severityText: "WARN",
+					attributes: { key: "value" },
+				}),
+			);
+		});
+	});
 
-  describe("log-trace correlation", () => {
-    it("includes traceId and spanId when explicit spanContext is provided", () => {
-      const logger = createLogger("test-service");
-      const spanContext = {
-        traceId: "abc123def456789012345678abcdef01",
-        spanId: "1234567890abcdef",
-        traceFlags: 1,
-      };
-      logger.info("correlated", undefined, { spanContext });
-      const output = stderrSpy.mock.calls[0][0] as string;
-      const parsed = JSON.parse(output.trim());
-      expect(parsed.traceId).toBe("abc123def456789012345678abcdef01");
-      expect(parsed.spanId).toBe("1234567890abcdef");
-    });
-  });
+	describe("log-trace correlation", () => {
+		it("includes traceId and spanId when explicit spanContext is provided", () => {
+			const logger = createLogger("test-service");
+			const spanContext = {
+				traceId: "abc123def456789012345678abcdef01",
+				spanId: "1234567890abcdef",
+				traceFlags: 1,
+			};
+			logger.info("correlated", undefined, { spanContext });
+			const output = stderrSpy.mock.calls[0][0] as string;
+			const parsed = JSON.parse(output.trim());
+			expect(parsed.traceId).toBe("abc123def456789012345678abcdef01");
+			expect(parsed.spanId).toBe("1234567890abcdef");
+		});
+	});
 
-  describe("no-throw guarantee", () => {
-    it("does not throw when stderr.write fails", () => {
-      stderrSpy.mockImplementation(() => {
-        throw new Error("write failed");
-      });
-      const logger = createLogger("test-service");
-      expect(() => logger.info("should not throw")).not.toThrow();
-    });
+	describe("no-throw guarantee", () => {
+		it("does not throw when stderr.write fails", () => {
+			stderrSpy.mockImplementation(() => {
+				throw new Error("write failed");
+			});
+			const logger = createLogger("test-service");
+			expect(() => logger.info("should not throw")).not.toThrow();
+		});
 
-    it("does not throw when OTLP emit fails", () => {
-      mockEmit.mockImplementation(() => {
-        throw new Error("emit failed");
-      });
-      const logger = createLogger("test-service");
-      expect(() => logger.info("should not throw")).not.toThrow();
-    });
+		it("does not throw when OTLP emit fails", () => {
+			mockEmit.mockImplementation(() => {
+				throw new Error("emit failed");
+			});
+			const logger = createLogger("test-service");
+			expect(() => logger.info("should not throw")).not.toThrow();
+		});
 
-    it("does not throw with null/undefined message edge cases", () => {
-      const logger = createLogger("test-service");
-      expect(() => logger.info("")).not.toThrow();
-      expect(() => logger.info(null as unknown as string)).not.toThrow();
-    });
-  });
+		it("does not throw with null/undefined message edge cases", () => {
+			const logger = createLogger("test-service");
+			expect(() => logger.info("")).not.toThrow();
+			expect(() => logger.info(null as unknown as string)).not.toThrow();
+		});
+	});
 });
 
 describe("getLogger", () => {
-  let stderrSpy: ReturnType<typeof vi.spyOn>;
+	let stderrSpy: ReturnType<typeof vi.spyOn>;
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    // Reset default logger so tests are isolated
-    setDefaultLogger(undefined as never);
-  });
+	beforeEach(() => {
+		vi.clearAllMocks();
+		stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+		// Reset default logger so tests are isolated
+		setDefaultLogger(undefined as never);
+	});
 
-  afterEach(() => {
-    stderrSpy.mockRestore();
-  });
+	afterEach(() => {
+		stderrSpy.mockRestore();
+	});
 
-  it("returns a working logger when nothing is configured", () => {
-    const logger = getLogger();
-    expect(typeof logger.info).toBe("function");
-    logger.info("fallback");
-    expect(stderrSpy).toHaveBeenCalled();
-  });
+	it("returns a working logger when nothing is configured", () => {
+		const logger = getLogger();
+		expect(typeof logger.info).toBe("function");
+		logger.info("fallback");
+		expect(stderrSpy).toHaveBeenCalled();
+	});
 
-  it("returns the default logger set via setDefaultLogger", () => {
-    const custom = createLogger("default-svc");
-    setDefaultLogger(custom);
-    const logger = getLogger();
-    expect(logger).toBe(custom);
-  });
+	it("returns the default logger set via setDefaultLogger", () => {
+		const custom = createLogger("default-svc");
+		setDefaultLogger(custom);
+		const logger = getLogger();
+		expect(logger).toBe(custom);
+	});
 
-  it("returns the context-scoped logger inside runWithLogger", () => {
-    const outer = createLogger("outer");
-    const inner = createLogger("inner");
+	it("returns the context-scoped logger inside runWithLogger", () => {
+		const outer = createLogger("outer");
+		const inner = createLogger("inner");
 
-    setDefaultLogger(outer);
+		setDefaultLogger(outer);
 
-    runWithLogger(inner, () => {
-      expect(getLogger()).toBe(inner);
-    });
+		runWithLogger(inner, () => {
+			expect(getLogger()).toBe(inner);
+		});
 
-    // Outside the runWithLogger scope, falls back to default
-    expect(getLogger()).toBe(outer);
-  });
+		// Outside the runWithLogger scope, falls back to default
+		expect(getLogger()).toBe(outer);
+	});
 
-  it("context-scoped logger takes precedence over default", () => {
-    const defaultLogger = createLogger("default");
-    const scopedLogger = createLogger("scoped");
-    setDefaultLogger(defaultLogger);
+	it("context-scoped logger takes precedence over default", () => {
+		const defaultLogger = createLogger("default");
+		const scopedLogger = createLogger("scoped");
+		setDefaultLogger(defaultLogger);
 
-    runWithLogger(scopedLogger, () => {
-      const logger = getLogger();
-      expect(logger).toBe(scopedLogger);
-      expect(logger).not.toBe(defaultLogger);
-    });
-  });
+		runWithLogger(scopedLogger, () => {
+			const logger = getLogger();
+			expect(logger).toBe(scopedLogger);
+			expect(logger).not.toBe(defaultLogger);
+		});
+	});
 
-  it("nested runWithLogger scopes work correctly", () => {
-    const a = createLogger("a");
-    const b = createLogger("b");
+	it("nested runWithLogger scopes work correctly", () => {
+		const a = createLogger("a");
+		const b = createLogger("b");
 
-    runWithLogger(a, () => {
-      expect(getLogger()).toBe(a);
+		runWithLogger(a, () => {
+			expect(getLogger()).toBe(a);
 
-      runWithLogger(b, () => {
-        expect(getLogger()).toBe(b);
-      });
+			runWithLogger(b, () => {
+				expect(getLogger()).toBe(b);
+			});
 
-      // After inner scope exits, reverts to outer
-      expect(getLogger()).toBe(a);
-    });
-  });
+			// After inner scope exits, reverts to outer
+			expect(getLogger()).toBe(a);
+		});
+	});
 
-  it("runWithLogger works with async functions", async () => {
-    const custom = createLogger("async-svc");
+	it("runWithLogger works with async functions", async () => {
+		const custom = createLogger("async-svc");
 
-    await runWithLogger(custom, async () => {
-      // Simulate async work
-      await new Promise((r) => setTimeout(r, 10));
-      expect(getLogger()).toBe(custom);
-    });
-  });
+		await runWithLogger(custom, async () => {
+			// Simulate async work
+			await new Promise((r) => setTimeout(r, 10));
+			expect(getLogger()).toBe(custom);
+		});
+	});
 
-  it("can use noopLogger as the context-scoped logger", () => {
-    runWithLogger(noopLogger, () => {
-      expect(getLogger()).toBe(noopLogger);
-    });
-  });
+	it("can use noopLogger as the context-scoped logger", () => {
+		runWithLogger(noopLogger, () => {
+			expect(getLogger()).toBe(noopLogger);
+		});
+	});
 });

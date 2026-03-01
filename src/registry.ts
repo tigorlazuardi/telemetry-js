@@ -1,12 +1,12 @@
-import type { RuntimeAdapter, RuntimeName } from "./types.js";
 import { noopSDKResult } from "./noop.js";
-import { nodeAdapter } from "./runtimes/node.js";
 import { cloudflareWorkerAdapter } from "./runtimes/cloudflare/worker.js";
+import { nodeAdapter } from "./runtimes/node.js";
+import type { RuntimeAdapter, RuntimeName } from "./types.js";
 
 const noopAdapter: RuntimeAdapter = {
-  name: "noop",
-  detect: () => false,
-  setup: () => noopSDKResult(),
+	name: "noop",
+	detect: () => false,
+	setup: () => noopSDKResult(),
 };
 
 const adapters: RuntimeAdapter[] = [];
@@ -30,7 +30,7 @@ const adapters: RuntimeAdapter[] = [];
  * ```
  */
 export function register(adapter: RuntimeAdapter): void {
-  adapters.push(adapter);
+	adapters.push(adapter);
 }
 
 /**
@@ -43,18 +43,18 @@ export function register(adapter: RuntimeAdapter): void {
  * @returns The matched adapter, or a noop adapter if none matches.
  */
 export function resolve(runtimeName?: RuntimeName): RuntimeAdapter {
-  if (runtimeName) {
-    const adapter = adapters.find((a) => a.name === runtimeName);
-    return adapter ?? noopAdapter;
-  }
+	if (runtimeName) {
+		const adapter = adapters.find((a) => a.name === runtimeName);
+		return adapter ?? noopAdapter;
+	}
 
-  for (const adapter of adapters) {
-    if (adapter.detect()) {
-      return adapter;
-    }
-  }
+	for (const adapter of adapters) {
+		if (adapter.detect()) {
+			return adapter;
+		}
+	}
 
-  return noopAdapter;
+	return noopAdapter;
 }
 
 /**
@@ -63,7 +63,7 @@ export function resolve(runtimeName?: RuntimeName): RuntimeAdapter {
  * @returns An array of registered {@link RuntimeAdapter} instances.
  */
 export function getRegisteredAdapters(): readonly RuntimeAdapter[] {
-  return adapters;
+	return adapters;
 }
 
 // Pre-register built-in adapters (detection order matters: CF Workers first, then Node)

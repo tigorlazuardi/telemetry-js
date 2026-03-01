@@ -1,72 +1,78 @@
 {
-  "name": "@tigorhutasuhut/telemetry-js",
-  "version": "0.2.4",
-  "description": "OpenTelemetry SDK setup abstraction for multiple runtimes",
-  "license": "Apache-2.0",
-  "type": "module",
-  "exports": {
-    ".": {
-      "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      },
-      "require": {
-        "types": "./dist/index.d.cts",
-        "default": "./dist/index.cjs"
-      }
-    }
-  },
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "files": [
-    "dist",
-    "README.md"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/tigorlazuardi/telemetry-js.git"
-  },
-  "scripts": {
-    "prepublishOnly": "tsup",
-    "build": "tsup",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "docs:generate": "typedoc"
-  },
-  "packageManager": "pnpm@10.30.0",
-  "dependencies": {
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/api-logs": "^0.212.0",
-    "@opentelemetry/core": "^2.5.1",
-    "@opentelemetry/exporter-logs-otlp-http": "^0.212.0",
-    "@opentelemetry/exporter-metrics-otlp-http": "^0.212.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.212.0",
-    "@opentelemetry/resources": "^2.5.1",
-    "@opentelemetry/sdk-logs": "^0.212.0",
-    "@opentelemetry/sdk-metrics": "^2.5.1",
-    "@opentelemetry/sdk-node": "^0.212.0",
-    "@opentelemetry/sdk-trace-base": "^2.5.1",
-    "@opentelemetry/semantic-conventions": "^1.39.0"
-  },
-  "peerDependencies": {
-    "pino": ">=8.0.0"
-  },
-  "peerDependenciesMeta": {
-    "pino": {
-      "optional": true
-    }
-  },
-  "devDependencies": {
-    "eslint": "^10.0.0",
-    "jiti": "^2.4.2",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.0",
-    "tsup": "^8.5.1",
-    "typedoc": "^0.28.17",
-    "vitest": "^4.0.18"
-  }
+	"name": "@tigorhutasuhut/telemetry-js",
+	"version": "0.2.4",
+	"description": "OpenTelemetry SDK setup abstraction for multiple runtimes",
+	"license": "Apache-2.0",
+	"type": "module",
+	"exports": {
+		".": {
+			"import": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			},
+			"require": {
+				"types": "./dist/index.d.cts",
+				"default": "./dist/index.cjs"
+			}
+		}
+	},
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/tigorlazuardi/telemetry-js.git"
+	},
+	"scripts": {
+		"prepublishOnly": "tsup",
+		"build": "tsup",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"docs:generate": "typedoc",
+		"prepare": "husky"
+	},
+	"packageManager": "pnpm@10.30.0",
+	"dependencies": {
+		"@opentelemetry/api": "^1.9.0",
+		"@opentelemetry/api-logs": "^0.212.0",
+		"@opentelemetry/core": "^2.5.1",
+		"@opentelemetry/exporter-logs-otlp-http": "^0.212.0",
+		"@opentelemetry/exporter-metrics-otlp-http": "^0.212.0",
+		"@opentelemetry/exporter-trace-otlp-http": "^0.212.0",
+		"@opentelemetry/resources": "^2.5.1",
+		"@opentelemetry/sdk-logs": "^0.212.0",
+		"@opentelemetry/sdk-metrics": "^2.5.1",
+		"@opentelemetry/sdk-node": "^0.212.0",
+		"@opentelemetry/sdk-trace-base": "^2.5.1",
+		"@opentelemetry/semantic-conventions": "^1.39.0"
+	},
+	"peerDependencies": {
+		"pino": ">=8.0.0"
+	},
+	"peerDependenciesMeta": {
+		"pino": {
+			"optional": true
+		}
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.4",
+		"husky": "^9.1.7",
+		"lint-staged": "^16.3.0",
+		"tsup": "^8.5.1",
+		"typedoc": "^0.28.17",
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.18"
+	},
+	"lint-staged": {
+		"*.{ts,tsx,js,jsx,json,jsonc}": [
+			"biome check --write --no-errors-on-unmatched"
+		]
+	}
 }

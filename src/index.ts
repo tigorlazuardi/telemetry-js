@@ -11,42 +11,48 @@
  * ```
  */
 
-export { initSDK, getResource } from "./sdk.js";
-export { register, resolve, getRegisteredAdapters } from "./registry.js";
-export { instrument, traceHandler } from "./runtimes/cloudflare/instrument.js";
-export type { InstrumentOptions, TraceHandlerOptions, MinimalExecutionContext } from "./runtimes/cloudflare/instrument.js";
-export { instrumentWorkflow, injectTraceparent, extractTraceparent } from "./runtimes/cloudflare/workflow.js";
-export type { InstrumentWorkflowOptions } from "./runtimes/cloudflare/workflow.js";
-export { withTrace } from "./with-trace.js";
-export type { WithTraceOptions } from "./with-trace.js";
-export { traced } from "./traced.js";
-export type { TracedInput, TracedCallContext } from "./traced.js";
-export { resolveSignalEndpoint, normalizeEndpoint } from "./endpoints.js";
-export { instrumentFetch } from "./instrument-fetch.js";
-export type { InstrumentFetchConfig } from "./instrument-fetch.js";
-export { createLogger, getLogger, runWithLogger, setDefaultLogger } from "./logger.js";
-export { noopSDKResult, noopLogger } from "./noop.js";
 export type {
-  RuntimeName,
-  SDKConfig,
-  RuntimeAdapter,
-  SDKResult,
-  Logger,
-  LogAttributes,
-  LogOptions,
-  LogLevel,
-  OtlpSignal,
-} from "./types.js";
-
+	Counter,
+	Histogram,
+	Meter,
+	MeterProvider,
+	UpDownCounter,
+} from "@opentelemetry/api";
 // Metrics API re-exports
 export { metrics } from "@opentelemetry/api";
-export type {
-  MeterProvider,
-  Meter,
-  Counter,
-  Histogram,
-  UpDownCounter,
-} from "@opentelemetry/api";
-
 // Resource re-exports
 export type { Resource } from "@opentelemetry/resources";
+export { normalizeEndpoint, resolveSignalEndpoint } from "./endpoints.js";
+export type { InstrumentFetchConfig } from "./instrument-fetch.js";
+export { instrumentFetch } from "./instrument-fetch.js";
+export { createLogger, getLogger, runWithLogger, setDefaultLogger } from "./logger.js";
+export { noopLogger, noopSDKResult } from "./noop.js";
+export { getRegisteredAdapters, register, resolve } from "./registry.js";
+export type {
+	InstrumentOptions,
+	MinimalExecutionContext,
+	TraceHandlerOptions,
+} from "./runtimes/cloudflare/instrument.js";
+export { instrument, traceHandler } from "./runtimes/cloudflare/instrument.js";
+export type { InstrumentWorkflowOptions } from "./runtimes/cloudflare/workflow.js";
+export {
+	extractTraceparent,
+	injectTraceparent,
+	instrumentWorkflow,
+} from "./runtimes/cloudflare/workflow.js";
+export { getResource, initSDK } from "./sdk.js";
+export type { TracedCallContext, TracedInput } from "./traced.js";
+export { traced } from "./traced.js";
+export type {
+	LogAttributes,
+	Logger,
+	LogLevel,
+	LogOptions,
+	OtlpSignal,
+	RuntimeAdapter,
+	RuntimeName,
+	SDKConfig,
+	SDKResult,
+} from "./types.js";
+export type { WithTraceOptions } from "./with-trace.js";
+export { withTrace } from "./with-trace.js";

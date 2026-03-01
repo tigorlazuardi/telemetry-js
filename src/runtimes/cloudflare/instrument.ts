@@ -8,8 +8,9 @@ import {
 	type TextMapSetter,
 	trace,
 } from "@opentelemetry/api";
+import { getLogger } from "../../logger.js";
 import { initSDK } from "../../sdk.js";
-import type { SDKConfig, SDKResult } from "../../types.js";
+import type { LogAttributes, Logger, SDKConfig, SDKResult } from "../../types.js";
 
 // Minimal CF types to avoid @cloudflare/workers-types dependency
 interface ExecutionContext {
@@ -93,6 +94,71 @@ function flush(): Promise<void> {
 	return sdkResult.forceFlush();
 }
 
+/* ------------------------------------------------------------------ */
+/*  Auto-logging helpers                                              */
+/* ------------------------------------------------------------------ */
+
+const DEFAULT_SENSITIVE_HEADERS = new Set([
+	"authorization",
+	"cookie",
+	"set-cookie",
+	"x-api-key",
+	"proxy-authorization",
+]);
+
+const LOGGABLE_CONTENT_TYPES = [
+	"application/json",
+	"application/x-www-form-urlencoded",
+	"text/plain",
+];
+
+const DEFAULT_MAX_BODY_LOG_SIZE = 65_536; // 64 KB
+
+function redactHeaders(headers: Headers, sensitiveSet: Set<string>): Record<string, string> {
+	const result: Record<string, string> = {};
+	headers.forEach((value, key) => {
+		result[key] = sensitiveSet.has(key.toLowerCase()) ? "[REDACTED]" : value;
+	});
+	return result;
+}
+
+function isLoggableContentType(headers: Headers): boolean {
+	const ct = headers.get("content-type") ?? "";
+	return LOGGABLE_CONTENT_TYPES.some((t) => ct.includes(t));
+}
+
+function contentTypeSummary(headers: Headers): string {
+	return headers.get("content-type") ?? "unknown";
+}
+
+async function readLimitedBody(
+	readable: { text(): Promise<string> },
+	maxBytes: number,
+): Promise<string | undefined> {
+	try {
+		const text = await readable.text();
+		if (text.length > maxBytes) {
+			return `${text.slice(0, maxBytes)}[truncated]`;
+		}
+		return text;
+	} catch {
+		return undefined;
+	}
+}
+
+/** Format byte count into human-readable string. */
+function humanBytes(bytes: number): string {
+	if (bytes < 1024) return `${bytes}B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+	return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+/** Format milliseconds into human-readable duration. */
+function humanDuration(ms: number): string {
+	if (ms < 1000) return `${ms}ms`;
+	return `${(ms / 1000).toFixed(2)}s`;
+}
+
 /**
  * Options for {@link traceHandler}.
  */
@@ -107,6 +173,23 @@ export interface TraceHandlerOptions<T = Response> extends InstrumentOptions {
 	handler: () => T | Promise<T>;
 	/** Optional callback invoked via `ctx.waitUntil` after the span ends. */
 	onFlush?: () => void | Promise<void>;
+	/**
+	 * Logger for automatic request/response logging.
+	 * When `true`, uses `getLogger()`. When a `Logger` instance, uses that.
+	 * When `false` or omitted, no automatic logging is performed.
+	 * @default false
+	 */
+	logger?: Logger | boolean;
+	/**
+	 * Header names whose values are replaced with `"[REDACTED]"` in logs.
+	 * Overrides the default set (`authorization`, `cookie`, `set-cookie`, `x-api-key`, `proxy-authorization`).
+	 */
+	sensitiveHeaders?: string[];
+	/**
+	 * Maximum bytes to read from request/response bodies for logging.
+	 * @default 65536 (64 KB)
+	 */
+	maxBodyLogSize?: number;
 }
 
 const headerGetter: TextMapGetter<Headers> = {
@@ -150,12 +233,36 @@ const headerSetter: TextMapSetter<Headers> = {
  * ```
  */
 export async function traceHandler<T = Response>(opts: TraceHandlerOptions<T>): Promise<T> {
-	const { context: ctx, env, request, handler, onFlush, ...sdkOpts } = opts;
+	const {
+		context: ctx,
+		env,
+		request,
+		handler,
+		onFlush,
+		logger: loggerOpt,
+		sensitiveHeaders,
+		maxBodyLogSize = DEFAULT_MAX_BODY_LOG_SIZE,
+		...sdkOpts
+	} = opts;
 	ensureSDK({ ...sdkOpts, env });
 	const tracer = trace.getTracer(opts.serviceName ?? "unknown");
 	const url = new URL(request.url);
 	const extractedCtx = propagation.extract(context.active(), request.headers, headerGetter);
 	let span: Span | undefined;
+
+	// Resolve logger
+	const logger: Logger | undefined =
+		loggerOpt === true ? getLogger() : loggerOpt === false ? undefined : loggerOpt || undefined;
+	const sensitiveSet = sensitiveHeaders
+		? new Set(sensitiveHeaders.map((h) => h.toLowerCase()))
+		: DEFAULT_SENSITIVE_HEADERS;
+
+	// Pre-read request body for logging (before it may be consumed)
+	let requestBodyPromise: Promise<string | undefined> | undefined;
+	if (logger && request.body && isLoggableContentType(request.headers)) {
+		requestBodyPromise = readLimitedBody(request.clone(), maxBodyLogSize);
+	}
+	const startTime = Date.now();
 
 	try {
 		const result = await tracer.startActiveSpan(
@@ -165,7 +272,7 @@ export async function traceHandler<T = Response>(opts: TraceHandlerOptions<T>): 
 				attributes: {
 					"http.method": request.method,
 					"http.url": request.url,
-					"http.target": url.pathname + url.search,
+					"http.target": `${url.pathname}${url.search}`,
 					"http.host": url.host,
 				},
 			},
@@ -187,6 +294,59 @@ export async function traceHandler<T = Response>(opts: TraceHandlerOptions<T>): 
 		if (result instanceof Response) {
 			const newResponse = new Response(result.body, result);
 			propagation.inject(context.active(), newResponse.headers, headerSetter);
+
+			// Auto-log the request/response
+			if (logger) {
+				const duration = Date.now() - startTime;
+				const responseSize = Number(newResponse.headers.get("content-length") ?? 0);
+
+				// Build log message: [Method] [Path] -- [status] [duration] [size]
+				const message = `${request.method} ${url.pathname} -- ${newResponse.status} ${humanDuration(duration)} ${humanBytes(responseSize)}`;
+
+				// Build attributes
+				const attrs: LogAttributes = {};
+
+				// Request attributes
+				attrs["http.request.method"] = request.method;
+				attrs["http.request.path"] = url.pathname;
+				if (url.search) attrs["http.request.query"] = url.search;
+				const ua = request.headers.get("user-agent");
+				if (ua) attrs["http.request.user_agent"] = ua;
+				attrs["http.request.headers"] = JSON.stringify(
+					redactHeaders(request.headers, sensitiveSet),
+				);
+				const requestBody = await requestBodyPromise;
+				if (requestBody !== undefined) {
+					attrs["http.request.body"] = requestBody;
+				} else if (request.body) {
+					attrs["http.request.body"] = `[${contentTypeSummary(request.headers)}]`;
+				}
+
+				// Response attributes
+				attrs["http.response.status"] = newResponse.status;
+				attrs["http.response.headers"] = JSON.stringify(
+					redactHeaders(newResponse.headers, sensitiveSet),
+				);
+				if (newResponse.body && isLoggableContentType(newResponse.headers)) {
+					const responseBody = await readLimitedBody(newResponse.clone(), maxBodyLogSize);
+					if (responseBody !== undefined) {
+						attrs["http.response.body"] = responseBody;
+					}
+				} else if (newResponse.body) {
+					attrs["http.response.body"] = `[${contentTypeSummary(newResponse.headers)}]`;
+				}
+				attrs["http.response.size"] = humanBytes(responseSize);
+				attrs["http.duration_ms"] = duration;
+
+				if (newResponse.status >= 500) {
+					logger.error(message, attrs);
+				} else if (newResponse.status >= 400) {
+					logger.warn(message, attrs);
+				} else {
+					logger.info(message, attrs);
+				}
+			}
+
 			return newResponse as T;
 		}
 
@@ -197,6 +357,21 @@ export async function traceHandler<T = Response>(opts: TraceHandlerOptions<T>): 
 			message: error instanceof Error ? error.message : String(error),
 		});
 		span?.recordException(error as Error);
+
+		// Log the error
+		if (logger) {
+			const duration = Date.now() - startTime;
+			const message = `${request.method} ${url.pathname} -- FAILED ${humanDuration(duration)}`;
+			const attrs: LogAttributes = {
+				"http.request.method": request.method,
+				"http.request.path": url.pathname,
+				"http.duration_ms": duration,
+				"http.error": error instanceof Error ? error.message : String(error),
+			};
+			if (url.search) attrs["http.request.query"] = url.search;
+			logger.error(message, attrs);
+		}
+
 		throw error;
 	} finally {
 		span?.end();

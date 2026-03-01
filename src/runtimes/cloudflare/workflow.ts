@@ -157,7 +157,6 @@ async function resolveParentContext(step: WorkflowStep, traceparent?: string): P
  * ```
  */
 export function instrumentWorkflow(opts: InstrumentWorkflowOptions = {}) {
-	// biome-ignore lint/suspicious/noExplicitAny: TC39 decorator constraint requires `any`
 	return <T extends abstract new (...args: any[]) => any>(
 		target: T,
 		_context: ClassDecoratorContext<T>,

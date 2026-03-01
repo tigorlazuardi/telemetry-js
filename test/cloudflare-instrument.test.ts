@@ -421,3 +421,330 @@ describe("traceHandler", () => {
 		);
 	});
 });
+
+describe("traceHandler auto-logging", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		_resetInstrumentState();
+	});
+
+	function createMockLogger() {
+		return {
+			debug: vi.fn(),
+			info: vi.fn(),
+			warn: vi.fn(),
+			error: vi.fn(),
+		};
+	}
+
+	it("logs info for 2xx responses with correct message format", async () => {
+		const logger = createMockLogger();
+		const ctx = createMockCtx();
+		const body = JSON.stringify({ ok: true });
+
+		await traceHandler({
+			context: ctx,
+			env: {},
+			request: new Request("https://example.com/api/test?q=1"),
+			serviceName: "test",
+			handler: () => new Response(body, { headers: { "content-length": "12" } }),
+			logger,
+		});
+
+		expect(logger.info).toHaveBeenCalledTimes(1);
+		const [message, attrs] = logger.info.mock.calls[0];
+		expect(message).toMatch(/^GET \/api\/test -- 200 \d+ms 12B$/);
+		expect(attrs["http.request.method"]).toBe("GET");
+		expect(attrs["http.request.path"]).toBe("/api/test");
+		expect(attrs["http.request.query"]).toBe("?q=1");
+		expect(attrs["http.response.status"]).toBe(200);
+		expect(attrs["http.duration_ms"]).toBeTypeOf("number");
+	});
+
+	it("logs warn for 4xx responses", async () => {
+		const logger = createMockLogger();
+		const ctx = createMockCtx();
+
+		await traceHandler({
+			context: ctx,
+			env: {},
+			request: new Request("https://example.com/api/test"),
+			serviceName: "test",
+			handler: () => new Response("not found", { status: 404 }),
+			logger,
+		});
+
+		expect(logger.warn).toHaveBeenCalledTimes(1);
+		expect(logger.info).not.toHaveBeenCalled();
+		const [message] = logger.warn.mock.calls[0];
+		expect(message).toMatch(/^GET \/api\/test -- 404/);
+	});
+
+	it("logs error for 5xx responses", async () => {
+		const logger = createMockLogger();
+		const ctx = createMockCtx();
+
+		await traceHandler({
+			context: ctx,
+			env: {},
+			request: new Request("https://example.com/api/test"),
+			serviceName: "test",
+			handler: () => new Response("server error", { status: 500 }),
+			logger,
+		});
+
+		expect(logger.error).toHaveBeenCalledTimes(1);
+		const [message] = logger.error.mock.calls[0];
+		expect(message).toMatch(/^GET \/api\/test -- 500/);
+	});
+
+	it("logs error on thrown exceptions", async () => {
+		const logger = createMockLogger();
+		const ctx = createMockCtx();
+
+		await expect(
+			traceHandler({
+				context: ctx,
+				env: {},
+				request: new Request("https://example.com/api/test"),
+				serviceName: "test",
+				handler: () => {
+					throw new Error("boom");
+				},
+				logger,
+			}),
+		).rejects.toThrow("boom");
+
+		expect(logger.error).toHaveBeenCalledTimes(1);
+		const [message, attrs] = logger.error.mock.calls[0];
+		expect(message).toMatch(/^GET \/api\/test -- FAILED/);
+		expect(attrs["http.error"]).toBe("boom");
+		expect(attrs["http.request.method"]).toBe("GET");
+		expect(attrs["http.request.path"]).toBe("/api/test");
+	});
+
+	it("does not log when logger is not provided", async () => {
+		const ctx = createMockCtx();
+
+		await traceHandler({
+			context: ctx,
+			env: {},
+			request: new Request("https://example.com/api/test"),
+			serviceName: "test",
+			handler: () => new Response("ok"),
+		});
+
+		// No crash, no logger called
+		expect(mockSpanFns.end).toHaveBeenCalled();
+	});
+
+	it("redacts sensitive headers by default", async () => {
+		const logger = createMockLogger();
+		const ctx = createMockCtx();
+
+		await traceHandler({
+			context: ctx,
+			env: {},
+			request: new Request("https://example.com/api/test", {
+				headers: {
+					authorization: "Bearer secret",
+					"x-custom": "visible",
+				},
+			}),
+			serviceName: "test",
+			handler: () => new Response("ok"),
+			logger,
+		});
+
+		const attrs = logger.info.mock.calls[0][1];
+		const reqHeaders = JSON.parse(attrs["http.request.headers"] as string);
+		expect(reqHeaders.authorization).toBe("[REDACTED]");
+		expect(reqHeaders["x-custom"]).toBe("visible");
+	});
+
+	it("uses custom sensitiveHeaders when provided", async () => {
+		const logger = createMockLogger();
+		const ctx = createMockCtx();
+
+		await traceHandler({
+			context: ctx,
+			env: {},
+			request: new Request("https://example.com/api/test", {
+				headers: {
+					authorization: "Bearer secret",
+					"x-secret": "hidden",
+				},
+			}),
+			serviceName: "test",
+			handler: () => new Response("ok"),
+			sensitiveHeaders: ["x-secret"],
+			logger,
+		});
+
+		const attrs = logger.info.mock.calls[0][1];
+		const reqHeaders = JSON.parse(attrs["http.request.headers"] as string);
+		// authorization NOT redacted because custom list overrides defaults
+		expect(reqHeaders.authorization).toBe("Bearer secret");
+		expect(reqHeaders["x-secret"]).toBe("[REDACTED]");
+	});
+
+	it("includes JSON request body in log", async () => {
+		const logger = createMockLogger();
+		const ctx = createMockCtx();
+		const body = JSON.stringify({ name: "test" });
+
+		await traceHandler({
+			context: ctx,
+			env: {},
+			request: new Request("https://example.com/api/test", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body,
+			}),
+			serviceName: "test",
+			handler: () => new Response("ok"),
+			logger,
+		});
+
+		const attrs = logger.info.mock.calls[0][1];
+		expect(attrs["http.request.body"]).toBe(body);
+	});
+
+	it("includes JSON response body in log", async () => {
+		const logger = createMockLogger();
+		const ctx = createMockCtx();
+		const responseBody = JSON.stringify({ result: "ok" });
+
+		await traceHandler({
+			context: ctx,
+			env: {},
+			request: new Request("https://example.com/api/test"),
+			serviceName: "test",
+			handler: () =>
+				new Response(responseBody, {
+					headers: { "content-type": "application/json" },
+				}),
+			logger,
+		});
+
+		const attrs = logger.info.mock.calls[0][1];
+		expect(attrs["http.response.body"]).toBe(responseBody);
+	});
+
+	it("shows mimetype for non-loggable body types", async () => {
+		const logger = createMockLogger();
+		const ctx = createMockCtx();
+
+		await traceHandler({
+			context: ctx,
+			env: {},
+			request: new Request("https://example.com/api/test", {
+				method: "POST",
+				headers: { "content-type": "multipart/form-data" },
+				body: "binary-data",
+			}),
+			serviceName: "test",
+			handler: () =>
+				new Response("image-data", {
+					headers: { "content-type": "image/png" },
+				}),
+			logger,
+		});
+
+		const attrs = logger.info.mock.calls[0][1];
+		expect(attrs["http.request.body"]).toBe("[multipart/form-data]");
+		expect(attrs["http.response.body"]).toBe("[image/png]");
+	});
+
+	it("does not include query when absent", async () => {
+		const logger = createMockLogger();
+		const ctx = createMockCtx();
+
+		await traceHandler({
+			context: ctx,
+			env: {},
+			request: new Request("https://example.com/api/test"),
+			serviceName: "test",
+			handler: () => new Response("ok"),
+			logger,
+		});
+
+		const attrs = logger.info.mock.calls[0][1];
+		expect(attrs["http.request.query"]).toBeUndefined();
+	});
+
+	it("accepts logger: true to use getLogger()", async () => {
+		// When logger: true is passed, it should use getLogger() which returns
+		// the noop logger (since no default is set in test). No crash expected.
+		const ctx = createMockCtx();
+
+		const response = await traceHandler({
+			context: ctx,
+			env: {},
+			request: new Request("https://example.com/api/test"),
+			serviceName: "test",
+			handler: () => new Response("ok"),
+			logger: true,
+		});
+
+		expect(response).toBeInstanceOf(Response);
+	});
+
+	it("human-readable response size", async () => {
+		const logger = createMockLogger();
+		const ctx = createMockCtx();
+
+		await traceHandler({
+			context: ctx,
+			env: {},
+			request: new Request("https://example.com/api/test"),
+			serviceName: "test",
+			handler: () =>
+				new Response("ok", {
+					headers: { "content-length": "2048" },
+				}),
+			logger,
+		});
+
+		const attrs = logger.info.mock.calls[0][1];
+		expect(attrs["http.response.size"]).toBe("2.0KB");
+		const [message] = logger.info.mock.calls[0];
+		expect(message).toContain("2.0KB");
+	});
+
+	it("includes user-agent in request attributes", async () => {
+		const logger = createMockLogger();
+		const ctx = createMockCtx();
+
+		await traceHandler({
+			context: ctx,
+			env: {},
+			request: new Request("https://example.com/api/test", {
+				headers: { "user-agent": "Mozilla/5.0 TestBrowser" },
+			}),
+			serviceName: "test",
+			handler: () => new Response("ok"),
+			logger,
+		});
+
+		const attrs = logger.info.mock.calls[0][1];
+		expect(attrs["http.request.user_agent"]).toBe("Mozilla/5.0 TestBrowser");
+	});
+
+	it("omits user-agent when not present", async () => {
+		const logger = createMockLogger();
+		const ctx = createMockCtx();
+
+		await traceHandler({
+			context: ctx,
+			env: {},
+			request: new Request("https://example.com/api/test"),
+			serviceName: "test",
+			handler: () => new Response("ok"),
+			logger,
+		});
+
+		const attrs = logger.info.mock.calls[0][1];
+		expect(attrs["http.request.user_agent"]).toBeUndefined();
+	});
+});

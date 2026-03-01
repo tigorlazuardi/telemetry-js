@@ -126,7 +126,6 @@ function createMockStep() {
 
 /** Helper: apply the decorator manually (no decorator syntax needed in tests). */
 function applyDecorator(
-	// biome-ignore lint/suspicious/noExplicitAny: decorator test helper
 	cls: new (...args: unknown[]) => any,
 	opts: Parameters<typeof instrumentWorkflow>[0] = {},
 ) {

@@ -187,7 +187,6 @@ function createPinoWriter(
 	serviceName: string | undefined,
 ): StderrWriter {
 	try {
-		// biome-ignore lint/suspicious/noExplicitAny: pino is dynamically loaded and untyped
 		let pinoLogger: any;
 		const pinoOpts: Record<string, unknown> = { level: "debug" };
 		if (serviceName) pinoOpts.name = serviceName;

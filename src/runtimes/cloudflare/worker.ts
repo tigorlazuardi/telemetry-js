@@ -13,39 +13,38 @@ import { performance as _perfHooksPerf } from "perf_hooks";
 
 const _perf = _perfHooksPerf as unknown as Record<string, unknown>;
 if (_perf && typeof _perf.timeOrigin !== "number") {
-  const _gp = globalThis.performance;
-  if (_gp) {
-    _perf.timeOrigin = _gp.timeOrigin;
-    if (typeof _perf.now !== "function") {
-      _perf.now = _gp.now.bind(_gp);
-    }
-  }
+	const _gp = globalThis.performance;
+	if (_gp) {
+		_perf.timeOrigin = _gp.timeOrigin;
+		if (typeof _perf.now !== "function") {
+			_perf.now = _gp.now.bind(_gp);
+		}
+	}
 }
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import {
-  metrics,
-  propagation,
-  trace,
-  type TracerProvider,
+	type Context,
+	type ContextManager,
+	context,
+	metrics,
+	propagation,
+	ROOT_CONTEXT,
+	type TracerProvider,
+	trace,
 } from "@opentelemetry/api";
 import { logs } from "@opentelemetry/api-logs";
 import {
-  CompositePropagator,
-  W3CBaggagePropagator,
-  W3CTraceContextPropagator,
+	CompositePropagator,
+	W3CBaggagePropagator,
+	W3CTraceContextPropagator,
 } from "@opentelemetry/core";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { LoggerProvider, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
-import {
-  MeterProvider,
-  PeriodicExportingMetricReader,
-} from "@opentelemetry/sdk-metrics";
-import {
-  BasicTracerProvider,
-  SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+import { MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
+import { BasicTracerProvider, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { detectCloudflareWorker } from "../../detect.js";
 import { resolveSignalEndpoint } from "../../endpoints.js";
@@ -54,117 +53,168 @@ import { noopSDKResult } from "../../noop.js";
 import { buildResource } from "../../resource.js";
 import type { RuntimeAdapter, SDKConfig, SDKResult } from "../../types.js";
 
+/**
+ * Lightweight {@link ContextManager} backed by {@link AsyncLocalStorage}.
+ *
+ * Cloudflare Workers support `AsyncLocalStorage` from `node:async_hooks` but
+ * `@opentelemetry/context-async-hooks` imports the `events` module which is
+ * **not** available in Workers.  This minimal implementation provides only
+ * the three methods the OTel API needs (`active`, `with`, `bind`) without
+ * pulling in Node-specific EventEmitter patching.
+ */
+class CloudflareContextManager implements ContextManager {
+	private _storage = new AsyncLocalStorage<Context>();
+
+	active(): Context {
+		return this._storage.getStore() ?? ROOT_CONTEXT;
+	}
+
+	with<A extends unknown[], F extends (...args: A) => ReturnType<F>>(
+		ctx: Context,
+		fn: F,
+		thisArg?: ThisParameterType<F>,
+		...args: A
+	): ReturnType<F> {
+		const cb = thisArg == null ? fn : fn.bind(thisArg);
+		return this._storage.run(ctx, cb as () => ReturnType<F>, ...args);
+	}
+
+	bind<T>(ctx: Context, target: T): T {
+		if (typeof target === "function") {
+			// eslint-disable-next-line @typescript-eslint/no-this-alias
+			const manager = this;
+			const bound = function (this: unknown, ...args: unknown[]) {
+				return manager.with(ctx, () => (target as Function).apply(this, args));
+			};
+			Object.defineProperty(bound, "length", {
+				value: (target as Function).length,
+				configurable: true,
+			});
+			return bound as unknown as T;
+		}
+		return target;
+	}
+
+	enable(): this {
+		return this;
+	}
+
+	disable(): this {
+		return this;
+	}
+}
+
 export const cloudflareWorkerAdapter: RuntimeAdapter = {
-  name: "cloudflare-worker",
-  detect: detectCloudflareWorker,
-  setup(config: SDKConfig): SDKResult {
-    try {
-      const { resource, warnings } = buildResource(config, []);
-      const resolvedServiceName =
-        (resource.attributes[ATTR_SERVICE_NAME] as string) ?? "unknown";
+	name: "cloudflare-worker",
+	detect: detectCloudflareWorker,
+	setup(config: SDKConfig): SDKResult {
+		try {
+			const { resource, warnings } = buildResource(config, []);
+			const resolvedServiceName = (resource.attributes[ATTR_SERVICE_NAME] as string) ?? "unknown";
 
-      const tracesEndpoint = resolveSignalEndpoint("traces", config);
-      const metricsEndpoint = resolveSignalEndpoint("metrics", config);
-      const logsEndpoint = resolveSignalEndpoint("logs", config);
+			// Register context manager so that context.active() / context.with()
+			// propagate the active span across async boundaries.  Without this,
+			// the OTel API falls back to NoopContextManager and trace correlation
+			// (trace_id / span_id on logs) silently breaks.
+			context.setGlobalContextManager(new CloudflareContextManager());
 
-      // Trace provider (only if endpoint resolves)
-      let provider: BasicTracerProvider | undefined;
-      if (tracesEndpoint) {
-        const traceExporter = new OTLPTraceExporter({
-          url: tracesEndpoint,
-          headers: config.exporterHeaders,
-        });
+			const tracesEndpoint = resolveSignalEndpoint("traces", config);
+			const metricsEndpoint = resolveSignalEndpoint("metrics", config);
+			const logsEndpoint = resolveSignalEndpoint("logs", config);
 
-        provider = new BasicTracerProvider({
-          resource,
-          spanProcessors: [new SimpleSpanProcessor(traceExporter)],
-        });
+			// Trace provider (only if endpoint resolves)
+			let provider: BasicTracerProvider | undefined;
+			if (tracesEndpoint) {
+				const traceExporter = new OTLPTraceExporter({
+					url: tracesEndpoint,
+					headers: config.exporterHeaders,
+				});
 
-        trace.setGlobalTracerProvider(provider as unknown as TracerProvider);
-      }
+				provider = new BasicTracerProvider({
+					resource,
+					spanProcessors: [new SimpleSpanProcessor(traceExporter)],
+				});
 
-      // Propagators are always set for context propagation
-      propagation.setGlobalPropagator(
-        new CompositePropagator({
-          propagators: [
-            new W3CTraceContextPropagator(),
-            new W3CBaggagePropagator(),
-          ],
-        }),
-      );
+				trace.setGlobalTracerProvider(provider as unknown as TracerProvider);
+			}
 
-      // Meter provider (only if endpoint resolves)
-      let meterProvider: MeterProvider | undefined;
-      if (metricsEndpoint) {
-        const metricExporter = new OTLPMetricExporter({
-          url: metricsEndpoint,
-          headers: config.exporterHeaders,
-        });
+			// Propagators are always set for context propagation
+			propagation.setGlobalPropagator(
+				new CompositePropagator({
+					propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
+				}),
+			);
 
-        const metricReader = new PeriodicExportingMetricReader({
-          exporter: metricExporter,
-          exportIntervalMillis: 2_147_483_647, // Disable periodic; rely on manual flush via ctx.waitUntil
-        });
+			// Meter provider (only if endpoint resolves)
+			let meterProvider: MeterProvider | undefined;
+			if (metricsEndpoint) {
+				const metricExporter = new OTLPMetricExporter({
+					url: metricsEndpoint,
+					headers: config.exporterHeaders,
+				});
 
-        meterProvider = new MeterProvider({
-          resource,
-          readers: [metricReader],
-        });
+				const metricReader = new PeriodicExportingMetricReader({
+					exporter: metricExporter,
+					exportIntervalMillis: 2_147_483_647, // Disable periodic; rely on manual flush via ctx.waitUntil
+				});
 
-        metrics.setGlobalMeterProvider(meterProvider);
-      }
+				meterProvider = new MeterProvider({
+					resource,
+					readers: [metricReader],
+				});
 
-      // Logger provider (only if endpoint resolves)
-      let loggerProvider: LoggerProvider | undefined;
-      if (logsEndpoint) {
-        const logExporter = new OTLPLogExporter({
-          url: logsEndpoint,
-          headers: config.exporterHeaders,
-        });
+				metrics.setGlobalMeterProvider(meterProvider);
+			}
 
-        loggerProvider = new LoggerProvider({
-          resource,
-          processors: [new SimpleLogRecordProcessor(logExporter)],
-        });
+			// Logger provider (only if endpoint resolves)
+			let loggerProvider: LoggerProvider | undefined;
+			if (logsEndpoint) {
+				const logExporter = new OTLPLogExporter({
+					url: logsEndpoint,
+					headers: config.exporterHeaders,
+				});
 
-        logs.setGlobalLoggerProvider(loggerProvider);
-      }
+				loggerProvider = new LoggerProvider({
+					resource,
+					processors: [new SimpleLogRecordProcessor(logExporter)],
+				});
 
-      const logger = createLogger(resolvedServiceName);
-      setDefaultLogger(logger);
-      for (const w of warnings) logger.warn(w);
+				logs.setGlobalLoggerProvider(loggerProvider);
+			}
 
-      return {
-        resource,
-        provider: provider
-          ? (provider as unknown as TracerProvider)
-          : trace.getTracerProvider(),
-        meterProvider,
-        loggerProvider,
-        logger,
-        async shutdown() {
-          try {
-            await provider?.shutdown();
-            await meterProvider?.shutdown();
-            await loggerProvider?.shutdown();
-          } catch {
-            // Never throw
-          }
-        },
-        async forceFlush() {
-          try {
-            await provider?.forceFlush();
-            await meterProvider?.forceFlush();
-            await loggerProvider?.forceFlush();
-          } catch (err) {
-            logger.warn("forceFlush failed", {
-              error: err instanceof Error ? err.message : String(err),
-            });
-          }
-        },
-      };
-    } catch {
-      return noopSDKResult();
-    }
-  },
+			const logger = createLogger(resolvedServiceName);
+			setDefaultLogger(logger);
+			for (const w of warnings) logger.warn(w);
+
+			return {
+				resource,
+				provider: provider ? (provider as unknown as TracerProvider) : trace.getTracerProvider(),
+				meterProvider,
+				loggerProvider,
+				logger,
+				async shutdown() {
+					try {
+						await provider?.shutdown();
+						await meterProvider?.shutdown();
+						await loggerProvider?.shutdown();
+					} catch {
+						// Never throw
+					}
+				},
+				async forceFlush() {
+					try {
+						await provider?.forceFlush();
+						await meterProvider?.forceFlush();
+						await loggerProvider?.forceFlush();
+					} catch (err) {
+						logger.warn("forceFlush failed", {
+							error: err instanceof Error ? err.message : String(err),
+						});
+					}
+				},
+			};
+		} catch {
+			return noopSDKResult();
+		}
+	},
 };

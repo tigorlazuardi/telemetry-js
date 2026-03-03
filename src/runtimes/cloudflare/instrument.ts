@@ -165,8 +165,13 @@ function humanDuration(ms: number): string {
 export interface TraceHandlerOptions<T = Response> extends InstrumentOptions {
 	/** Execution context — only `waitUntil` is required. Pass `undefined` during SSG/prerender. */
 	context: MinimalExecutionContext | undefined;
-	/** Environment variable map forwarded to the SDK. */
-	env: Record<string, string | undefined>;
+	/**
+	 * Environment variable map forwarded to the SDK.
+	 *
+	 * When used via {@link instrument}, this is merged with the fetch `env`
+	 * bindings, but fetch env takes precedence on key conflicts.
+	 */
+	env?: Record<string, string | undefined>;
 	/** The incoming `Request` to trace. */
 	request: Request;
 	/** The handler to call inside the traced span. */
@@ -416,7 +421,7 @@ export function instrument<Env = unknown>(
 	if (handler.fetch) {
 		const originalFetch = handler.fetch;
 		result.fetch = async (request: Request, env: Env, ctx: ExecutionContext): Promise<Response> => {
-			const ee = sdkConfig.env || env || {};
+			const ee = { ...sdkConfig.env, ...(env as Record<string, string | undefined>) };
 			return traceHandler({
 				...sdkConfig,
 				context: ctx,

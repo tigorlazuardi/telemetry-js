@@ -124,12 +124,7 @@ function resolveParentContext(parent?: Span | string) {
  * );
  * ```
  */
-export function withTrace<T>(fn: (span: Span) => T, opts?: WithTraceOptions): T;
-export function withTrace<T>(fn: (span: Span) => Promise<T>, opts?: WithTraceOptions): Promise<T>;
-export function withTrace<T>(
-	fn: (span: Span) => T | Promise<T>,
-	opts?: WithTraceOptions,
-): T | Promise<T> {
+export function withTrace<T>(fn: (span: Span) => T, opts?: WithTraceOptions): T {
 	const spanName = opts?.name ?? deriveSpanName(fn);
 	const tracerName = deriveTracerName();
 	const tracer = trace.getTracer(tracerName);
@@ -143,7 +138,7 @@ export function withTrace<T>(
 		},
 		parentCtx,
 		(span: Span) => {
-			let result: T | Promise<T>;
+			let result: T;
 			try {
 				result = fn(span);
 			} catch (error) {
@@ -171,7 +166,7 @@ export function withTrace<T>(
 						span.end();
 						throw error;
 					},
-				) as T | Promise<T>;
+				) as T;
 			}
 
 			span.end();

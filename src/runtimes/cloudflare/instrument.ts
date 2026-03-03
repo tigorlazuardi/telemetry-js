@@ -168,10 +168,13 @@ export interface TraceHandlerOptions<T = Response> extends InstrumentOptions {
 	/**
 	 * Environment variable map forwarded to the SDK.
 	 *
+	 * Accepts `Record<string, unknown>` for compatibility with Cloudflare's
+	 * `Env` bindings — only string values are read.
+	 *
 	 * When used via {@link instrument}, this is merged with the fetch `env`
 	 * bindings, but fetch env takes precedence on key conflicts.
 	 */
-	env?: Record<string, string | undefined>;
+	env?: Record<string, unknown>;
 	/** The incoming `Request` to trace. */
 	request: Request;
 	/** The handler to call inside the traced span. */
@@ -421,7 +424,7 @@ export function instrument<Env = unknown>(
 	if (handler.fetch) {
 		const originalFetch = handler.fetch;
 		result.fetch = async (request: Request, env: Env, ctx: ExecutionContext): Promise<Response> => {
-			const ee = { ...sdkConfig.env, ...(env as Record<string, string | undefined>) };
+			const ee = { ...sdkConfig.env, ...(env as Record<string, unknown>) };
 			return traceHandler({
 				...sdkConfig,
 				context: ctx,

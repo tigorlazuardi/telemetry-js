@@ -55,8 +55,12 @@ export interface SDKConfig {
 	/**
 	 * Environment variable map. Used in runtimes where `process.env` is unavailable
 	 * (e.g. Cloudflare Workers). Falls back to `process.env` when omitted.
+	 *
+	 * Accepts `Record<string, unknown>` for compatibility with Cloudflare's `Env`
+	 * bindings — only string values are read; non-string values (KV, D1, etc.)
+	 * are silently ignored.
 	 */
-	env?: Record<string, string | undefined>;
+	env?: Record<string, unknown>;
 }
 
 /**

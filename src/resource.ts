@@ -17,13 +17,11 @@ const ATTR_SERVICE_NAMESPACE = "service.namespace";
  * Only needed for runtimes where `process.env` is unavailable (e.g. Cloudflare Workers).
  * For Node the built-in `envDetector` already handles this.
  */
-export function parseEnvResourceAttributes(
-	env: Record<string, string | undefined>,
-): Record<string, string> {
+export function parseEnvResourceAttributes(env: Record<string, unknown>): Record<string, string> {
 	const attrs: Record<string, string> = {};
 
 	const raw = env.OTEL_RESOURCE_ATTRIBUTES;
-	if (raw) {
+	if (typeof raw === "string") {
 		for (const pair of raw.split(",")) {
 			const idx = pair.indexOf("=");
 			if (idx <= 0) continue;
@@ -34,7 +32,8 @@ export function parseEnvResourceAttributes(
 	}
 
 	// OTEL_SERVICE_NAME takes precedence over service.name in OTEL_RESOURCE_ATTRIBUTES
-	const serviceName = env.OTEL_SERVICE_NAME?.trim();
+	const serviceName =
+		typeof env.OTEL_SERVICE_NAME === "string" ? env.OTEL_SERVICE_NAME.trim() : undefined;
 	if (serviceName) {
 		attrs[ATTR_SERVICE_NAME] = serviceName;
 	}

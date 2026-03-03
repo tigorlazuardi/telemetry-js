@@ -23,7 +23,8 @@ export function normalizeEndpoint(url: string | undefined): string | undefined {
  */
 function readEnv(key: string, config: SDKConfig): string | undefined {
 	if (config.env) {
-		return config.env[key];
+		const value = config.env[key];
+		return typeof value === "string" ? value : undefined;
 	}
 	if (typeof process !== "undefined" && process.env) {
 		return process.env[key];

@@ -10,7 +10,7 @@ import {
 	type TextMapSetter,
 	trace,
 } from "@opentelemetry/api";
-import type { SDKConfig } from "../../types.js";
+import type { Carrier, SDKConfig } from "../../types.js";
 import { ensureSDK } from "./instrument.js";
 
 // Minimal CF Workflow types to avoid @cloudflare/workers-types dependency
@@ -259,10 +259,7 @@ export interface InjectContextOptions {
  * // => "hello"
  * ```
  */
-export function injectContext<T = unknown>(
-	value: T,
-	opts?: InjectContextOptions,
-): T extends Record<string, unknown> ? T & { traceparent: string; tracestate?: string } : T;
+export function injectContext<T = unknown>(value: T, opts?: InjectContextOptions): Carrier<T>;
 export function injectContext(value: unknown, opts?: InjectContextOptions): unknown {
 	if (value == null || typeof value !== "object") {
 		return value;

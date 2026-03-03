@@ -64,6 +64,29 @@ export interface SDKConfig {
 }
 
 /**
+ * Type helper that adds W3C trace propagation fields to an object type.
+ *
+ * - If `T` extends `object`, the result is `T & { traceparent: string; tracestate?: string; baggage?: string }`.
+ * - Otherwise, `T` is returned as-is.
+ *
+ * Useful for typing workflow params or message payloads that carry trace context.
+ *
+ * @example
+ * ```ts
+ * interface MyParams { userId: string }
+ *
+ * // { userId: string; traceparent: string; tracestate?: string; baggage?: string }
+ * type MyCarrier = Carrier<MyParams>;
+ *
+ * // Non-object types pass through unchanged
+ * type Str = Carrier<string>; // string
+ * ```
+ */
+export type Carrier<T> = T extends object
+	? T & { traceparent?: string; tracestate?: string; baggage?: string }
+	: T;
+
+/**
  * A runtime-specific adapter that the SDK uses to wire up
  * providers, processors, and exporters for a given environment.
  */

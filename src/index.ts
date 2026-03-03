@@ -49,6 +49,7 @@ export { getResource, initSDK } from "./sdk.js";
 export type { TracedCallContext, TracedInput } from "./traced.js";
 export { traced } from "./traced.js";
 export type {
+	Carrier,
 	LogAttributes,
 	Logger,
 	LogLevel,

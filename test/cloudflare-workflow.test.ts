@@ -188,11 +188,11 @@ describe("instrumentWorkflow", () => {
 		const instance = new Decorated();
 		await instance.run({ payload: {} }, step);
 
-		// First call to step.do should be __traceparent
-		expect(step.do).toHaveBeenCalledWith("__traceparent", expect.any(Function));
-		// Verify __traceparent was called before my-step
+		// First call to step.do should be traceparent
+		expect(step.do).toHaveBeenCalledWith("traceparent", expect.any(Function));
+		// Verify traceparent was called before my-step
 		const calls = step.do.mock.calls.map((c: unknown[]) => c[0]);
-		expect(calls[0]).toBe("__traceparent");
+		expect(calls[0]).toBe("traceparent");
 		expect(calls[1]).toBe("my-step");
 	});
 
@@ -241,7 +241,7 @@ describe("instrumentWorkflow", () => {
 		const step = createMockStep();
 		step.do.mockImplementation(
 			(name: string, configOrCallback: unknown, maybeCallback?: () => Promise<unknown>) => {
-				if (name === "__traceparent") {
+				if (name === "traceparent") {
 					return (configOrCallback as () => Promise<unknown>)();
 				}
 				const callback = typeof configOrCallback === "function" ? configOrCallback : maybeCallback;
@@ -316,7 +316,7 @@ describe("instrumentWorkflow", () => {
 		expect(sleepSpan!.end).toHaveBeenCalled();
 	});
 
-	it("auto-extracts traceparent from event.payload.__traceparent", async () => {
+	it("auto-extracts traceparent from event.payload.traceparent", async () => {
 		const step = createMockStep();
 		const tp = "00-abc123-def456-01";
 
@@ -329,9 +329,9 @@ describe("instrumentWorkflow", () => {
 
 		const Decorated = applyDecorator(TestWorkflow, { serviceName: "wf" });
 		const instance = new Decorated();
-		await instance.run({ payload: { __traceparent: tp } }, step);
+		await instance.run({ payload: { traceparent: tp } }, step);
 
-		const tpCall = step.do.mock.calls.find((c: unknown[]) => c[0] === "__traceparent");
+		const tpCall = step.do.mock.calls.find((c: unknown[]) => c[0] === "traceparent");
 		expect(tpCall).toBeDefined();
 		const tpResult = await (tpCall![1] as () => Promise<string>)();
 		expect(tpResult).toBe(tp);
@@ -453,7 +453,7 @@ describe("instrumentWorkflow", () => {
 		const step = createMockStep();
 		step.do.mockImplementation(
 			(name: string, configOrCallback: unknown, maybeCallback?: () => Promise<unknown>) => {
-				if (name === "__traceparent") {
+				if (name === "traceparent") {
 					return (configOrCallback as () => Promise<unknown>)();
 				}
 				const callback = typeof configOrCallback === "function" ? configOrCallback : maybeCallback;
@@ -551,11 +551,11 @@ describe("injectTraceparent", () => {
 		vi.clearAllMocks();
 	});
 
-	it("adds __traceparent to params", () => {
+	it("adds traceparent to params", () => {
 		const params = { userId: "abc", count: 42 };
 		const result = injectTraceparent(params);
 
-		expect(result.__traceparent).toBe("00-abc123-def456-01");
+		expect(result.traceparent).toBe("00-abc123-def456-01");
 		expect(result.userId).toBe("abc");
 		expect(result.count).toBe(42);
 	});
@@ -566,7 +566,7 @@ describe("injectTraceparent", () => {
 
 		expect(params).toEqual({ userId: "abc" });
 		expect(result).not.toBe(params);
-		expect(result.__traceparent).toBeDefined();
+		expect(result.traceparent).toBeDefined();
 	});
 });
 
@@ -575,16 +575,16 @@ describe("extractTraceparent", () => {
 		vi.clearAllMocks();
 	});
 
-	it("extracts __traceparent from params", () => {
+	it("extracts traceparent from params", () => {
 		const params = {
 			userId: "abc",
-			__traceparent: "00-abc123-def456-01",
+			traceparent: "00-abc123-def456-01",
 		};
 		const result = extractTraceparent(params);
 
 		expect(result.traceparent).toBe("00-abc123-def456-01");
 		expect(result.params).toEqual({ userId: "abc" });
-		expect("__traceparent" in result.params).toBe(false);
+		expect("traceparent" in result.params).toBe(false);
 	});
 
 	it("returns undefined traceparent when not present", () => {
@@ -598,7 +598,7 @@ describe("extractTraceparent", () => {
 	it("does not mutate original params", () => {
 		const params = {
 			userId: "abc",
-			__traceparent: "00-abc123-def456-01",
+			traceparent: "00-abc123-def456-01",
 		};
 		const original = { ...params };
 		extractTraceparent(params);

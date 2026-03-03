@@ -114,7 +114,7 @@ function createTracedStep(step: WorkflowStep): WorkflowStep {
 
 /**
  * Resolve the parent trace context by persisting/recovering the traceparent
- * via a `__traceparent` step (survives workflow hibernation).
+ * via a `traceparent` step (survives workflow hibernation).
  *
  * @internal
  */
@@ -125,7 +125,7 @@ async function resolveParentContext(step: WorkflowStep, traceparent?: string): P
 		propagation.inject(context.active(), carrier, objectSetter);
 		tp = carrier.traceparent ?? "";
 	}
-	const persisted: string = await step.do("__traceparent", () => Promise.resolve(tp!));
+	const persisted: string = await step.do("traceparent", () => Promise.resolve(tp!));
 	return persisted
 		? propagation.extract(ROOT_CONTEXT, { traceparent: persisted })
 		: context.active();
@@ -136,7 +136,7 @@ async function resolveParentContext(step: WorkflowStep, traceparent?: string): P
  *
  * Intercepts the `run` method to:
  * 1. Initialise the SDK (handles fresh isolates after hibernation)
- * 2. Auto-extract `__traceparent` from `event.payload` for cross-workflow propagation
+ * 2. Auto-extract `traceparent` from `event.payload` for cross-workflow propagation
  * 3. Create a root `workflow.run` span wrapping the entire execution
  * 4. Wrap the `step` object with traced versions of `do`, `sleep`, and `sleepUntil`
  *    — nested step calls automatically become children of the outer step's span
@@ -171,13 +171,13 @@ export function instrumentWorkflow(opts: InstrumentWorkflowOptions = {}) {
 
 			// Auto-extract traceparent from payload
 			let traceparent: string | undefined;
-			if (event?.payload && typeof event.payload === "object" && "__traceparent" in event.payload) {
-				traceparent = event.payload.__traceparent as string;
+			if (event?.payload && typeof event.payload === "object" && "traceparent" in event.payload) {
+				traceparent = event.payload.traceparent as string;
 			}
 
 			ensureSDK(sdkOpts);
 
-			// Resolve trace context (persists via __traceparent step)
+			// Resolve trace context (persists via traceparent step)
 			const parentCtx = await resolveParentContext(step, traceparent);
 
 			// Root span — step spans are children via context.active()
@@ -211,7 +211,7 @@ export function instrumentWorkflow(opts: InstrumentWorkflowOptions = {}) {
  * Inject the current trace context into workflow params for cross-workflow propagation.
  *
  * @param params - The params object to augment.
- * @returns A new object with `__traceparent` added.
+ * @returns A new object with `traceparent` added.
  *
  * @example
  * ```ts
@@ -221,17 +221,17 @@ export function instrumentWorkflow(opts: InstrumentWorkflowOptions = {}) {
  */
 export function injectTraceparent<T extends Record<string, unknown>>(
 	params: T,
-): T & { __traceparent: string } {
+): T & { traceparent: string } {
 	const carrier: Record<string, string> = {};
 	propagation.inject(context.active(), carrier, objectSetter);
-	return { ...params, __traceparent: carrier.traceparent ?? "" };
+	return { ...params, traceparent: carrier.traceparent, tracestate: carrier.tracestate };
 }
 
 /**
  * Extract trace context from workflow params received via cross-workflow propagation.
  *
- * @param params - The params object containing `__traceparent`.
- * @returns An object with cleaned `params` (without `__traceparent`) and the extracted `traceparent`.
+ * @param params - The params object containing `traceparent`.
+ * @returns An object with cleaned `params` (without `traceparent`) and the extracted `traceparent`.
  *
  * @example
  * ```ts
@@ -240,10 +240,15 @@ export function injectTraceparent<T extends Record<string, unknown>>(
  */
 export function extractTraceparent<T extends Record<string, unknown>>(
 	params: T,
-): { params: Omit<T, "__traceparent">; traceparent: string | undefined } {
-	const { __traceparent, ...rest } = params;
+): {
+	params: Omit<T, "traceparent" | "tracestate">;
+	traceparent: string | undefined;
+	tracestate: string | undefined;
+} {
+	const { traceparent, tracestate, ...rest } = params;
 	return {
-		params: rest as Omit<T, "__traceparent">,
-		traceparent: typeof __traceparent === "string" ? __traceparent : undefined,
+		params: rest as Omit<T, "traceparent" | "tracestate">,
+		traceparent: typeof traceparent === "string" ? traceparent : undefined,
+		tracestate: typeof tracestate === "string" ? tracestate : undefined,
 	};
 }

@@ -1,23 +1,32 @@
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Collect calls to startActiveSpan so we can inspect span name, options, context
-const mockSpan = {
-	setStatus: vi.fn(),
-	recordException: vi.fn(),
-	end: vi.fn(),
-	setAttribute: vi.fn(),
-};
-
-const startActiveSpanSpy = vi.fn(
-	(_name: string, _opts: unknown, _ctx: unknown, fn: (span: typeof mockSpan) => unknown) =>
-		fn(mockSpan),
-);
+const { mockSpan, startActiveSpanSpy, mockExtract } = vi.hoisted(() => {
+	const span = {
+		setStatus: vi.fn(),
+		recordException: vi.fn(),
+		end: vi.fn(),
+		setAttribute: vi.fn(),
+	};
+	return {
+		mockSpan: span,
+		startActiveSpanSpy: vi.fn(
+			(_name: string, _opts: unknown, _ctx: unknown, fn: (s: typeof span) => unknown) => fn(span),
+		),
+		mockExtract: vi.fn((_ctx: unknown, _carrier: unknown, _getter?: unknown) => ({
+			__extractedFrom: "carrier",
+		})),
+	};
+});
 
 vi.mock("@opentelemetry/api", async () => {
 	const actual = await vi.importActual("@opentelemetry/api");
 	return {
 		...actual,
+		propagation: {
+			...(actual as Record<string, unknown>).propagation,
+			extract: mockExtract,
+		},
 		trace: {
 			...(actual as Record<string, unknown>).trace,
 			getTracer: () => ({
@@ -210,6 +219,85 @@ describe("withTrace", () => {
 				code: SpanStatusCode.ERROR,
 				message: "string error",
 			});
+		});
+	});
+
+	describe("carrier option", () => {
+		it("extracts context from a carrier object via propagation.extract", () => {
+			const { ROOT_CONTEXT } = require("@opentelemetry/api");
+			const carrier = {
+				traceparent: "00-abc123-def456-01",
+				tracestate: "vendor=opaque",
+			};
+
+			withTrace((_span) => 42, { carrier });
+
+			expect(mockExtract).toHaveBeenCalledOnce();
+			const [ctx, carrierArg, getter] = mockExtract.mock.calls[0] as unknown[];
+			expect(ctx).toBe(ROOT_CONTEXT);
+			expect(carrierArg).toBe(carrier);
+			// Verify the getter reads string values correctly
+			const g = getter as {
+				keys: (c: Record<string, unknown>) => string[];
+				get: (c: Record<string, unknown>, k: string) => string | undefined;
+			};
+			expect(g.keys(carrier)).toEqual(["traceparent", "tracestate"]);
+			expect(g.get(carrier, "traceparent")).toBe("00-abc123-def456-01");
+
+			// The extracted context should be passed to startActiveSpan
+			const parentCtx = startActiveSpanSpy.mock.calls[0][2];
+			expect(parentCtx).toEqual({ __extractedFrom: "carrier" });
+		});
+
+		it("parent takes precedence over carrier", () => {
+			const carrier = {
+				traceparent: "00-abc123-def456-01",
+			};
+			const traceparent = "00-ffff-aaaa-01";
+
+			withTrace((_span) => 42, { parent: traceparent, carrier });
+
+			// propagation.extract is called for the parent string, not the carrier
+			expect(mockExtract).toHaveBeenCalledOnce();
+			const [, carrierArg] = mockExtract.mock.calls[0] as unknown[];
+			// The carrier passed to extract should be { traceparent } from the parent string path
+			expect(carrierArg).toEqual({ traceparent });
+		});
+
+		it("ignores non-object carrier values", () => {
+			withTrace((_span) => 42, { carrier: "not-an-object" });
+
+			// Should not call propagation.extract for the carrier
+			expect(mockExtract).not.toHaveBeenCalled();
+		});
+
+		it("ignores null carrier", () => {
+			withTrace((_span) => 42, { carrier: null });
+
+			expect(mockExtract).not.toHaveBeenCalled();
+		});
+
+		it("ignores undefined carrier", () => {
+			withTrace((_span) => 42, { carrier: undefined });
+
+			expect(mockExtract).not.toHaveBeenCalled();
+		});
+
+		it("getter returns undefined for non-string values in carrier", () => {
+			const carrier = {
+				traceparent: "00-abc123-def456-01",
+				numericField: 42,
+				nullField: null,
+			};
+
+			withTrace((_span) => 42, { carrier });
+
+			const getter = mockExtract.mock.calls[0][2] as {
+				get: (c: Record<string, unknown>, k: string) => string | undefined;
+			};
+			expect(getter.get(carrier, "traceparent")).toBe("00-abc123-def456-01");
+			expect(getter.get(carrier, "numericField")).toBeUndefined();
+			expect(getter.get(carrier, "nullField")).toBeUndefined();
 		});
 	});
 });

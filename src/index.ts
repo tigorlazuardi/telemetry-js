@@ -34,10 +34,15 @@ export type {
 	TraceHandlerOptions,
 } from "./runtimes/cloudflare/instrument.js";
 export { instrument, traceHandler } from "./runtimes/cloudflare/instrument.js";
-export type { InstrumentWorkflowOptions } from "./runtimes/cloudflare/workflow.js";
+export type {
+	InjectContextOptions,
+	InstrumentWorkflowOptions,
+} from "./runtimes/cloudflare/workflow.js";
 export {
+	extractContext,
+	extractSpan,
 	extractTraceparent,
-	injectTraceparent,
+	injectContext,
 	instrumentWorkflow,
 } from "./runtimes/cloudflare/workflow.js";
 export { getResource, initSDK } from "./sdk.js";

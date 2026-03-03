@@ -98,6 +98,7 @@ vi.mock("@opentelemetry/api", async () => {
 					}
 				},
 			}),
+			getSpan: vi.fn((ctx: unknown) => (ctx as Record<string, unknown>)?.__remoteSpan),
 			setSpan: vi.fn((ctx: unknown, span: unknown) => ({ ...Object(ctx), __span: span })),
 		},
 	};
@@ -105,8 +106,10 @@ vi.mock("@opentelemetry/api", async () => {
 
 import { _resetInstrumentState } from "../src/runtimes/cloudflare/instrument.js";
 import {
+	extractContext,
+	extractSpan,
 	extractTraceparent,
-	injectTraceparent,
+	injectContext,
 	instrumentWorkflow,
 } from "../src/runtimes/cloudflare/workflow.js";
 import { initSDK } from "../src/sdk.js";
@@ -546,30 +549,6 @@ describe("instrumentWorkflow", () => {
 	});
 });
 
-describe("injectTraceparent", () => {
-	beforeEach(() => {
-		vi.clearAllMocks();
-	});
-
-	it("adds traceparent to params", () => {
-		const params = { userId: "abc", count: 42 };
-		const result = injectTraceparent(params);
-
-		expect(result.traceparent).toBe("00-abc123-def456-01");
-		expect(result.userId).toBe("abc");
-		expect(result.count).toBe(42);
-	});
-
-	it("does not mutate original params", () => {
-		const params = { userId: "abc" };
-		const result = injectTraceparent(params);
-
-		expect(params).toEqual({ userId: "abc" });
-		expect(result).not.toBe(params);
-		expect(result.traceparent).toBeDefined();
-	});
-});
-
 describe("extractTraceparent", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -604,5 +583,248 @@ describe("extractTraceparent", () => {
 		extractTraceparent(params);
 
 		expect(params).toEqual(original);
+	});
+});
+
+describe("extractContext", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("extracts context using propagation.extract with objectGetter", () => {
+		const params = {
+			userId: "abc",
+			traceparent: "00-abc123-def456-01",
+			tracestate: "vendor=opaque",
+		};
+
+		const result = extractContext(params);
+
+		// propagation.extract should have been called with ROOT_CONTEXT, params, and an objectGetter
+		expect(mockExtract).toHaveBeenCalledOnce();
+		const call = mockExtract.mock.calls[0] as unknown[];
+		const [ctx, carrier, getter] = call as [
+			unknown,
+			typeof params,
+			{
+				keys: (c: Record<string, unknown>) => string[];
+				get: (c: Record<string, unknown>, k: string) => string | undefined;
+			},
+		];
+		expect(ctx).toEqual({}); // ROOT_CONTEXT mock
+		expect(carrier).toBe(params);
+		// Verify the getter works correctly
+		expect(getter.keys(params)).toEqual(["userId", "traceparent", "tracestate"]);
+		expect(getter.get(params, "traceparent")).toBe("00-abc123-def456-01");
+		expect(getter.get(params, "tracestate")).toBe("vendor=opaque");
+		expect(getter.get(params, "userId")).toBe("abc");
+		// Non-string values return undefined
+		expect(getter.get({ num: 42 }, "num")).toBeUndefined();
+
+		// Returned context is whatever propagation.extract returned
+		expect(result.context).toEqual({ extracted: true });
+	});
+
+	it("returns cleaned params without traceparent, tracestate, and baggage", () => {
+		const params = {
+			userId: "abc",
+			traceparent: "00-abc123-def456-01",
+			tracestate: "vendor=opaque",
+			baggage: "key=value",
+			extra: "data",
+		};
+
+		const result = extractContext(params);
+
+		expect(result.params).toEqual({ userId: "abc", extra: "data" });
+		expect("traceparent" in result.params).toBe(false);
+		expect("tracestate" in result.params).toBe(false);
+		expect("baggage" in result.params).toBe(false);
+	});
+
+	it("works when no propagation fields are present", () => {
+		const params = { userId: "abc" };
+
+		const result = extractContext(params);
+
+		expect(mockExtract).toHaveBeenCalledOnce();
+		expect(result.params).toEqual({ userId: "abc" });
+		expect(result.context).toEqual({ extracted: true });
+	});
+
+	it("does not mutate original params", () => {
+		const params = {
+			userId: "abc",
+			traceparent: "00-abc123-def456-01",
+		};
+		const original = { ...params };
+		extractContext(params);
+
+		expect(params).toEqual(original);
+	});
+});
+
+describe("extractSpan", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("extracts span from context returned by propagation.extract", () => {
+		const mockRemoteSpan = { spanContext: () => ({}) };
+		(mockExtract as ReturnType<typeof vi.fn>).mockReturnValueOnce({
+			extracted: true,
+			__remoteSpan: mockRemoteSpan,
+		});
+
+		const params = {
+			userId: "abc",
+			traceparent: "00-abc123-def456-01",
+		};
+
+		const result = extractSpan(params);
+
+		expect(result.span).toBe(mockRemoteSpan);
+		expect(result.context).toEqual({ extracted: true, __remoteSpan: mockRemoteSpan });
+		expect(result.params).toEqual({ userId: "abc" });
+	});
+
+	it("returns undefined span when context has no span", () => {
+		(mockExtract as ReturnType<typeof vi.fn>).mockReturnValueOnce({ extracted: true });
+
+		const params = { userId: "abc" };
+
+		const result = extractSpan(params);
+
+		expect(result.span).toBeUndefined();
+		expect(result.context).toEqual({ extracted: true });
+		expect(result.params).toEqual({ userId: "abc" });
+	});
+
+	it("returns cleaned params without propagation keys", () => {
+		const params = {
+			userId: "abc",
+			traceparent: "00-abc123-def456-01",
+			tracestate: "vendor=opaque",
+			baggage: "key=value",
+		};
+
+		const result = extractSpan(params);
+
+		expect(result.params).toEqual({ userId: "abc" });
+		expect("traceparent" in result.params).toBe(false);
+		expect("tracestate" in result.params).toBe(false);
+		expect("baggage" in result.params).toBe(false);
+	});
+
+	it("does not mutate original params", () => {
+		const params = {
+			userId: "abc",
+			traceparent: "00-abc123-def456-01",
+		};
+		const original = { ...params };
+		extractSpan(params);
+
+		expect(params).toEqual(original);
+	});
+});
+
+describe("injectContext", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("injects trace context into an object", () => {
+		const params = { userId: "abc", count: 42 };
+		const result = injectContext(params);
+
+		expect(result.traceparent).toBe("00-abc123-def456-01");
+		expect(result.userId).toBe("abc");
+		expect(result.count).toBe(42);
+	});
+
+	it("does not mutate original object", () => {
+		const params = { userId: "abc" };
+		const result = injectContext(params);
+
+		expect(params).toEqual({ userId: "abc" });
+		expect(result).not.toBe(params);
+		expect(result.traceparent).toBeDefined();
+	});
+
+	it("returns string as-is", () => {
+		const value = "hello";
+		const result = injectContext(value);
+
+		expect(result).toBe("hello");
+		expect(mockInject).not.toHaveBeenCalled();
+	});
+
+	it("returns number as-is", () => {
+		const result = injectContext(42);
+
+		expect(result).toBe(42);
+		expect(mockInject).not.toHaveBeenCalled();
+	});
+
+	it("returns null as-is", () => {
+		const result = injectContext(null);
+
+		expect(result).toBeNull();
+		expect(mockInject).not.toHaveBeenCalled();
+	});
+
+	it("returns undefined as-is", () => {
+		const result = injectContext(undefined);
+
+		expect(result).toBeUndefined();
+		expect(mockInject).not.toHaveBeenCalled();
+	});
+
+	it("returns boolean as-is", () => {
+		const result = injectContext(true);
+
+		expect(result).toBe(true);
+		expect(mockInject).not.toHaveBeenCalled();
+	});
+
+	it("works with an empty object", () => {
+		const result = injectContext({});
+
+		expect(result.traceparent).toBe("00-abc123-def456-01");
+	});
+
+	it("injects into arrays (typeof array is object)", () => {
+		const arr = [1, 2, 3];
+		const result = injectContext(arr);
+
+		// Arrays are objects, so inject is called
+		expect(mockInject).toHaveBeenCalled();
+		expect(result).not.toBe(arr);
+	});
+
+	it("uses context.active() by default", () => {
+		injectContext({ key: "value" });
+
+		expect(mockInject).toHaveBeenCalledOnce();
+		const ctx = mockInject.mock.calls[0][0];
+		// activeCtxStack top is the mock active context
+		expect(ctx).toEqual(activeCtxStack[activeCtxStack.length - 1]);
+	});
+
+	it("uses explicit context when provided", () => {
+		const customCtx = { custom: true };
+		injectContext({ key: "value" }, { context: customCtx as never });
+
+		expect(mockInject).toHaveBeenCalledOnce();
+		const ctx = mockInject.mock.calls[0][0];
+		expect(ctx).toBe(customCtx);
+	});
+
+	it("ignores context option for non-object values", () => {
+		const customCtx = { custom: true };
+		const result = injectContext("hello", { context: customCtx as never });
+
+		expect(result).toBe("hello");
+		expect(mockInject).not.toHaveBeenCalled();
 	});
 });

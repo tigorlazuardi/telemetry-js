@@ -3,8 +3,10 @@ import {
 	context,
 	propagation,
 	ROOT_CONTEXT,
+	type Span,
 	SpanKind,
 	SpanStatusCode,
+	type TextMapGetter,
 	type TextMapSetter,
 	trace,
 } from "@opentelemetry/api";
@@ -23,6 +25,16 @@ interface WorkflowStep {
 	sleep(name: string, duration: string): Promise<void>;
 	sleepUntil(name: string, timestamp: Date | string): Promise<void>;
 }
+
+const objectGetter: TextMapGetter<Record<string, unknown>> = {
+	keys(carrier) {
+		return Object.keys(carrier);
+	},
+	get(carrier, key) {
+		const value = carrier[key];
+		return typeof value === "string" ? value : undefined;
+	},
+};
 
 const objectSetter: TextMapSetter<Record<string, string>> = {
 	set(carrier, key, value) {
@@ -208,23 +220,56 @@ export function instrumentWorkflow(opts: InstrumentWorkflowOptions = {}) {
 }
 
 /**
- * Inject the current trace context into workflow params for cross-workflow propagation.
+ * Options for {@link injectContext}.
+ */
+export interface InjectContextOptions {
+	/**
+	 * The OpenTelemetry {@link Context} to inject from.
+	 *
+	 * When omitted, the current active context (`context.active()`) is used.
+	 */
+	context?: Context;
+}
+
+/**
+ * Inject trace context into an arbitrary value using the globally registered
+ * textmap propagator.
  *
- * @param params - The params object to augment.
- * @returns A new object with `traceparent` added.
+ * - If `value` is a non-null object, propagation fields (`traceparent`,
+ *   `tracestate`, etc.) are merged into a shallow copy and the augmented
+ *   object is returned.
+ * - For any other type the value is returned unchanged.
+ *
+ * @param value - The value to (potentially) augment with trace context.
+ * @param opts  - Optional settings (e.g. explicit {@link Context}).
+ * @returns The original value (non-objects) or a new object with propagation
+ *          fields added.
  *
  * @example
  * ```ts
- * const params = injectTraceparent({ userId: "abc" });
- * await env.CHILD_WORKFLOW.create({ params });
+ * // Object — trace context is injected from the active context
+ * const params = injectContext({ userId: "abc" });
+ * // => { userId: "abc", traceparent: "00-…", tracestate: "…" }
+ *
+ * // Explicit context
+ * const params = injectContext({ userId: "abc" }, { context: parentCtx });
+ *
+ * // Non-object — returned as-is
+ * const str = injectContext("hello");
+ * // => "hello"
  * ```
  */
-export function injectTraceparent<T extends Record<string, unknown>>(
-	params: T,
-): T & { traceparent: string; tracestate?: string } {
+export function injectContext<T = unknown>(
+	value: T,
+	opts?: InjectContextOptions,
+): T extends Record<string, unknown> ? T & { traceparent: string; tracestate?: string } : T;
+export function injectContext(value: unknown, opts?: InjectContextOptions): unknown {
+	if (value == null || typeof value !== "object") {
+		return value;
+	}
 	const carrier: Record<string, string> = {};
-	propagation.inject(context.active(), carrier, objectSetter);
-	return { ...params, traceparent: carrier.traceparent, tracestate: carrier.tracestate };
+	propagation.inject(opts?.context ?? context.active(), carrier, objectSetter);
+	return { ...(value as Record<string, unknown>), ...carrier };
 }
 
 /**
@@ -250,5 +295,75 @@ export function extractTraceparent<T extends Record<string, unknown>>(
 		params: rest as Omit<T, "traceparent" | "tracestate">,
 		traceparent: typeof traceparent === "string" ? traceparent : undefined,
 		tracestate: typeof tracestate === "string" ? tracestate : undefined,
+	};
+}
+
+/**
+ * Extract an OpenTelemetry {@link Context} from workflow params using the
+ * globally registered textmap propagator (W3C TraceContext + Baggage by default).
+ *
+ * Unlike {@link extractTraceparent}, which only pulls out raw strings, this
+ * function returns a fully hydrated `Context` that can be passed as a parent
+ * to `tracer.startActiveSpan()` or `withTrace()`.
+ *
+ * The returned `params` are cleaned of all propagation keys (`traceparent`,
+ * `tracestate`, `baggage`, …).
+ *
+ * @param params - The params object containing propagation headers.
+ * @returns An object with the extracted `context` and cleaned `params`.
+ *
+ * @example
+ * ```ts
+ * const { params: clean, context: parentCtx } = extractContext(event.payload);
+ * tracer.startActiveSpan("my-span", {}, parentCtx, (span) => { ... });
+ * ```
+ */
+export function extractContext<T extends Record<string, unknown>>(
+	params: T,
+): {
+	params: Omit<T, "traceparent" | "tracestate" | "baggage">;
+	context: Context;
+} {
+	const ctx = propagation.extract(ROOT_CONTEXT, params, objectGetter);
+	const { traceparent, tracestate, baggage, ...rest } = params;
+	return {
+		params: rest as Omit<T, "traceparent" | "tracestate" | "baggage">,
+		context: ctx,
+	};
+}
+
+/**
+ * Extract a {@link Span} from workflow params using the globally registered
+ * textmap propagator.
+ *
+ * This is a convenience wrapper around {@link extractContext} that also
+ * retrieves the remote span from the extracted context via
+ * `trace.getSpan()`. The returned span is a non-recording remote span
+ * suitable for use as a `parent` option in {@link withTrace} or
+ * `trace.setSpan()`.
+ *
+ * @param params - The params object containing propagation headers.
+ * @returns An object with the extracted `span` (if any), `context`, and cleaned `params`.
+ *
+ * @example
+ * ```ts
+ * const { params: clean, span: parentSpan } = extractSpan(event.payload);
+ * await withTrace(
+ *   async (span) => { ... },
+ *   { parent: parentSpan, name: "child-operation" },
+ * );
+ * ```
+ */
+export function extractSpan<T extends Record<string, unknown>>(
+	params: T,
+): {
+	params: Omit<T, "traceparent" | "tracestate" | "baggage">;
+	context: Context;
+	span: Span | undefined;
+} {
+	const extracted = extractContext(params);
+	return {
+		...extracted,
+		span: trace.getSpan(extracted.context),
 	};
 }

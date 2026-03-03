@@ -5,6 +5,7 @@ import {
 	type Span,
 	SpanKind,
 	SpanStatusCode,
+	type TextMapGetter,
 	trace,
 } from "@opentelemetry/api";
 
@@ -25,6 +26,19 @@ export interface WithTraceOptions {
 	 * When omitted the current active context is inherited.
 	 */
 	parent?: Span | string;
+	/**
+	 * An opaque carrier object (e.g. incoming headers, workflow params) from
+	 * which trace context is extracted using the globally registered textmap
+	 * propagator.
+	 *
+	 * If both `parent` and `carrier` are provided, `parent` takes precedence.
+	 * The carrier is only used when `parent` is not set.
+	 *
+	 * The value must be a non-null object whose string-valued properties are
+	 * read by the propagator (e.g. `{ traceparent: "00-…", tracestate: "…" }`).
+	 * Non-object values are silently ignored.
+	 */
+	carrier?: unknown;
 }
 
 /**
@@ -78,18 +92,38 @@ function deriveTracerName(): string {
 	return "@tigorhutasuhut/telemetry-js";
 }
 
-/**
- * Build the parent context from the `parent` option.
- */
-function resolveParentContext(parent?: Span | string) {
-	if (!parent) return context.active();
+const objectGetter: TextMapGetter<Record<string, unknown>> = {
+	keys(carrier) {
+		return Object.keys(carrier);
+	},
+	get(carrier, key) {
+		const value = carrier[key];
+		return typeof value === "string" ? value : undefined;
+	},
+};
 
-	if (typeof parent === "string") {
-		return propagation.extract(ROOT_CONTEXT, { traceparent: parent });
+/**
+ * Build the parent context from the `parent` and `carrier` options.
+ *
+ * Resolution order:
+ * 1. `parent` (Span or traceparent string) — highest priority
+ * 2. `carrier` (object extracted via textmap propagator)
+ * 3. `context.active()` — fallback
+ */
+function resolveParentContext(parent?: Span | string, carrier?: unknown) {
+	if (parent) {
+		if (typeof parent === "string") {
+			return propagation.extract(ROOT_CONTEXT, { traceparent: parent });
+		}
+		// parent is a Span
+		return trace.setSpan(context.active(), parent);
 	}
 
-	// parent is a Span
-	return trace.setSpan(context.active(), parent);
+	if (carrier != null && typeof carrier === "object") {
+		return propagation.extract(ROOT_CONTEXT, carrier as Record<string, unknown>, objectGetter);
+	}
+
+	return context.active();
 }
 
 /**
@@ -128,7 +162,7 @@ export function withTrace<T>(fn: (span: Span) => T, opts?: WithTraceOptions): T 
 	const spanName = opts?.name ?? deriveSpanName(fn);
 	const tracerName = deriveTracerName();
 	const tracer = trace.getTracer(tracerName);
-	const parentCtx = resolveParentContext(opts?.parent);
+	const parentCtx = resolveParentContext(opts?.parent, opts?.carrier);
 
 	return tracer.startActiveSpan(
 		spanName,

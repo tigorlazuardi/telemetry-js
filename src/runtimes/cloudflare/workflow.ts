@@ -221,7 +221,7 @@ export function instrumentWorkflow(opts: InstrumentWorkflowOptions = {}) {
  */
 export function injectTraceparent<T extends Record<string, unknown>>(
 	params: T,
-): T & { traceparent: string } {
+): T & { traceparent: string; tracestate?: string } {
 	const carrier: Record<string, string> = {};
 	propagation.inject(context.active(), carrier, objectSetter);
 	return { ...params, traceparent: carrier.traceparent, tracestate: carrier.tracestate };

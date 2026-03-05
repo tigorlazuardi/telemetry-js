@@ -24,7 +24,7 @@ export { metrics } from "@opentelemetry/api";
 export type { Resource } from "@opentelemetry/resources";
 export { normalizeEndpoint, resolveSignalEndpoint } from "./endpoints.js";
 export type { InstrumentFetchConfig } from "./instrument-fetch.js";
-export { instrumentFetch } from "./instrument-fetch.js";
+export { getOriginalFetch, instrumentFetch } from "./instrument-fetch.js";
 export { createLogger, getLogger, runWithLogger, setDefaultLogger } from "./logger.js";
 export { noopLogger, noopSDKResult } from "./noop.js";
 export { getRegisteredAdapters, register, resolve } from "./registry.js";

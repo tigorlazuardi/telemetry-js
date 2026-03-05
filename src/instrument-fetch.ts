@@ -8,6 +8,53 @@ import {
 } from "@opentelemetry/api";
 import type { LogAttributes, Logger } from "./types.js";
 
+/**
+ * Snapshot of `globalThis.fetch` captured before any instrumentation.
+ *
+ * Used by internal exporters ({@link getOriginalFetch}) to avoid the
+ * infinite loop: export → instrumented fetch → new span → export …
+ */
+let _originalFetch: typeof fetch | null = null;
+
+/**
+ * Return the **un-instrumented** `fetch` function.
+ *
+ * If {@link instrumentFetch} (or the Cloudflare `instrument()` helper that
+ * calls it internally) has been used, this returns the original reference
+ * captured *before* the monkey-patch was applied.
+ *
+ * Falls back to `globalThis.fetch` when no instrumentation has occurred.
+ *
+ * @example
+ * ```ts
+ * import { getOriginalFetch } from "@tigorhutasuhut/telemetry-js";
+ *
+ * // Always hits the network without creating a span:
+ * const res = await getOriginalFetch()("https://collector.example.com/v1/traces", { method: "POST", body });
+ * ```
+ */
+export function getOriginalFetch(): typeof fetch {
+	return _originalFetch ?? globalThis.fetch;
+}
+
+/**
+ * Store the original fetch reference. Called once before the first patch.
+ * @internal
+ */
+function captureOriginalFetch(): void {
+	if (!_originalFetch) {
+		_originalFetch = globalThis.fetch;
+	}
+}
+
+/**
+ * Reset stored original fetch (for testing).
+ * @internal
+ */
+export function _resetOriginalFetch(): void {
+	_originalFetch = null;
+}
+
 const DEFAULT_SENSITIVE_HEADERS = new Set([
 	"authorization",
 	"cookie",
@@ -79,6 +126,21 @@ async function readLimitedBody(
  * into outgoing headers via `propagation.inject()`, and optionally emits a single
  * structured log entry with the full request/response round-trip details.
  *
+ * **Cloudflare Workers** — you do **not** need to call this manually.
+ * {@link instrument} and {@link traceHandler} automatically monkey-patch
+ * `globalThis.fetch` on the first request.  Use {@link getOriginalFetch} if
+ * you need the un-instrumented version (e.g. for OTLP export calls).
+ *
+ * **Node.js** — you do **not** need to call this either.
+ * `@opentelemetry/sdk-node` (used internally by `initSDK`) registers
+ * auto-instrumentation for `http`/`undici` which already traces outgoing
+ * requests.  Calling `instrumentFetch` on top of that would produce
+ * duplicate spans.
+ *
+ * This function is mainly useful when you need **custom control** over which
+ * `fetch` reference is wrapped, or when running in a non-standard runtime
+ * where neither the Cloudflare nor Node.js adapters apply.
+ *
  * @param originalFetch - The `fetch` function to wrap (typically `globalThis.fetch`).
  * @param config - Optional configuration.
  * @returns A wrapped `fetch` with the same signature.
@@ -95,6 +157,7 @@ export function instrumentFetch(
 	originalFetch: typeof fetch,
 	config?: InstrumentFetchConfig,
 ): typeof fetch {
+	captureOriginalFetch();
 	const serviceName = config?.serviceName ?? "fetch";
 	const logger = config?.logger;
 	const sensitiveSet = config?.sensitiveHeaders

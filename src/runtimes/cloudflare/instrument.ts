@@ -8,6 +8,7 @@ import {
 	type TextMapSetter,
 	trace,
 } from "@opentelemetry/api";
+import { instrumentFetch } from "../../instrument-fetch.js";
 import { getLogger } from "../../logger.js";
 import { initSDK } from "../../sdk.js";
 import type { LogAttributes, Logger, SDKConfig, SDKResult } from "../../types.js";
@@ -81,12 +82,27 @@ interface ExportedHandler<Env = unknown> {
 export interface InstrumentOptions extends Omit<SDKConfig, "runtime"> {}
 
 let sdkResult: SDKResult | null = null;
+let fetchPatched = false;
 
 export function ensureSDK(config: Omit<SDKConfig, "runtime">): SDKResult {
 	if (!sdkResult) {
 		sdkResult = initSDK({ ...config, runtime: "cloudflare-worker" });
 	}
 	return sdkResult;
+}
+
+/**
+ * Monkey-patch `globalThis.fetch` with {@link instrumentFetch} exactly once.
+ *
+ * Called from both {@link instrument} and {@link traceHandler} so that
+ * outgoing `fetch` calls are automatically traced regardless of which
+ * entry-point the consumer uses.  The guard ensures the patch is never
+ * applied twice.
+ */
+function ensureFetchPatched(): void {
+	if (fetchPatched) return;
+	fetchPatched = true;
+	globalThis.fetch = instrumentFetch(globalThis.fetch);
 }
 
 function flush(): Promise<void> {
@@ -253,6 +269,7 @@ export async function traceHandler<T = Response>(opts: TraceHandlerOptions<T>): 
 		...sdkOpts
 	} = opts;
 	ensureSDK({ ...sdkOpts, env });
+	ensureFetchPatched();
 	const tracer = trace.getTracer(opts.serviceName ?? "unknown");
 	const url = new URL(request.url);
 	const extractedCtx = propagation.extract(context.active(), request.headers, headerGetter);
@@ -419,7 +436,7 @@ export function instrument<Env = unknown>(
 	opts?: InstrumentOptions,
 ): ExportedHandler<Env> {
 	const sdkConfig = opts ?? {};
-	sdkConfig.env = sdkConfig.env || process.env || {};
+	sdkConfig.env = sdkConfig.env || globalThis.process?.env || {};
 	const result: ExportedHandler<Env> = {};
 
 	if (handler.fetch) {
@@ -446,6 +463,7 @@ export function instrument<Env = unknown>(
 			ctx: ExecutionContext,
 		): Promise<void> => {
 			ensureSDK(sdkConfig);
+			ensureFetchPatched();
 			const tracer = trace.getTracer(sdkConfig.serviceName ?? "unknown");
 			let span: Span | undefined;
 
@@ -483,6 +501,7 @@ export function instrument<Env = unknown>(
 		const originalQueue = handler.queue;
 		result.queue = async (batch: MessageBatch, env: Env, ctx: ExecutionContext): Promise<void> => {
 			ensureSDK(sdkConfig);
+			ensureFetchPatched();
 			const tracer = trace.getTracer(sdkConfig.serviceName ?? "unknown");
 			let span: Span | undefined;
 
@@ -526,4 +545,5 @@ export function instrument<Env = unknown>(
  */
 export function _resetInstrumentState(): void {
 	sdkResult = null;
+	fetchPatched = false;
 }

@@ -39,9 +39,6 @@ import {
 	W3CBaggagePropagator,
 	W3CTraceContextPropagator,
 } from "@opentelemetry/core";
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
-import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { LoggerProvider, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { BasicTracerProvider, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
@@ -52,6 +49,7 @@ import { createLogger, setDefaultLogger } from "../../logger.js";
 import { noopSDKResult } from "../../noop.js";
 import { buildResource } from "../../resource.js";
 import type { RuntimeAdapter, SDKConfig, SDKResult } from "../../types.js";
+import { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "./fetch-exporter.js";
 
 /**
  * Lightweight {@link ContextManager} backed by {@link AsyncLocalStorage}.
@@ -125,7 +123,7 @@ export const cloudflareWorkerAdapter: RuntimeAdapter = {
 			// Trace provider (only if endpoint resolves)
 			let provider: BasicTracerProvider | undefined;
 			if (tracesEndpoint) {
-				const traceExporter = new OTLPTraceExporter({
+				const traceExporter = new FetchTraceExporter({
 					url: tracesEndpoint,
 					headers: config.exporterHeaders,
 				});
@@ -148,7 +146,7 @@ export const cloudflareWorkerAdapter: RuntimeAdapter = {
 			// Meter provider (only if endpoint resolves)
 			let meterProvider: MeterProvider | undefined;
 			if (metricsEndpoint) {
-				const metricExporter = new OTLPMetricExporter({
+				const metricExporter = new FetchMetricExporter({
 					url: metricsEndpoint,
 					headers: config.exporterHeaders,
 				});
@@ -169,7 +167,7 @@ export const cloudflareWorkerAdapter: RuntimeAdapter = {
 			// Logger provider (only if endpoint resolves)
 			let loggerProvider: LoggerProvider | undefined;
 			if (logsEndpoint) {
-				const logExporter = new OTLPLogExporter({
+				const logExporter = new FetchLogExporter({
 					url: logsEndpoint,
 					headers: config.exporterHeaders,
 				});

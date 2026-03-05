@@ -5,20 +5,37 @@
 	"license": "Apache-2.0",
 	"type": "module",
 	"exports": {
-		".": {
+		"./cloudflare": {
 			"import": {
-				"types": "./dist/index.d.ts",
-				"default": "./dist/index.js"
+				"types": "./dist/cloudflare.d.ts",
+				"default": "./dist/cloudflare.js"
 			},
 			"require": {
-				"types": "./dist/index.d.cts",
-				"default": "./dist/index.cjs"
+				"types": "./dist/cloudflare.d.cts",
+				"default": "./dist/cloudflare.cjs"
+			}
+		},
+		"./node": {
+			"import": {
+				"types": "./dist/node.d.ts",
+				"default": "./dist/node.js"
+			},
+			"require": {
+				"types": "./dist/node.d.cts",
+				"default": "./dist/node.cjs"
+			}
+		},
+		"./browser": {
+			"import": {
+				"types": "./dist/browser.d.ts",
+				"default": "./dist/browser.js"
+			},
+			"require": {
+				"types": "./dist/browser.d.cts",
+				"default": "./dist/browser.cjs"
 			}
 		}
 	},
-	"main": "./dist/index.cjs",
-	"module": "./dist/index.js",
-	"types": "./dist/index.d.ts",
 	"files": [
 		"dist",
 		"README.md"
@@ -64,6 +81,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.4",
+		"@types/node": "^25.3.3",
 		"husky": "^9.1.7",
 		"lint-staged": "^16.3.0",
 		"tsup": "^8.5.1",

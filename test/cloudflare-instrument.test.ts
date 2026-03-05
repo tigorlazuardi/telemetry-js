@@ -1,20 +1,24 @@
 import { SpanStatusCode } from "@opentelemetry/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock initSDK - all fns defined inside factory to avoid hoisting issues
+// Mock cloudflareWorkerAdapter - all fns defined inside factory to avoid hoisting issues
 const { mockForceFlush } = vi.hoisted(() => ({
 	mockForceFlush: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock("../src/sdk.js", () => {
+vi.mock("../src/runtimes/cloudflare/worker.js", () => {
 	return {
-		initSDK: vi.fn().mockReturnValue({
-			resource: { attributes: {} },
-			provider: {},
-			meterProvider: {},
-			logger: { debug() {}, info() {}, warn() {}, error() {} },
-			shutdown: vi.fn().mockResolvedValue(undefined),
-			forceFlush: mockForceFlush,
-		}),
+		cloudflareWorkerAdapter: {
+			name: "cloudflare-worker",
+			detect: () => true,
+			setup: vi.fn().mockReturnValue({
+				resource: { attributes: {} },
+				provider: {},
+				meterProvider: {},
+				logger: { debug() {}, info() {}, warn() {}, error() {} },
+				shutdown: vi.fn().mockResolvedValue(undefined),
+				forceFlush: mockForceFlush,
+			}),
+		},
 	};
 });
 
@@ -70,7 +74,7 @@ import {
 	instrument,
 	traceHandler,
 } from "../src/runtimes/cloudflare/instrument.js";
-import { initSDK } from "../src/sdk.js";
+import { cloudflareWorkerAdapter } from "../src/runtimes/cloudflare/worker.js";
 
 function createMockCtx() {
 	return {
@@ -213,10 +217,9 @@ describe("instrument", () => {
 			const ctx = createMockCtx();
 			await handler.fetch!(new Request("https://example.com/"), {}, ctx);
 
-			expect(initSDK).toHaveBeenCalledWith(
+			expect(cloudflareWorkerAdapter.setup).toHaveBeenCalledWith(
 				expect.objectContaining({
 					serviceName: "auto-init-test",
-					runtime: "cloudflare-worker",
 				}),
 			);
 		});
@@ -231,7 +234,7 @@ describe("instrument", () => {
 			await handler.fetch!(new Request("https://example.com/"), {}, ctx);
 			await handler.fetch!(new Request("https://example.com/other"), {}, ctx);
 
-			expect(initSDK).toHaveBeenCalledTimes(1);
+			expect(cloudflareWorkerAdapter.setup).toHaveBeenCalledTimes(1);
 		});
 	});
 

@@ -52,7 +52,7 @@ async function fetchSend(opts: FetchSendOptions): Promise<ExportResult> {
 				"Content-Type": "application/json",
 				...opts.headers,
 			},
-			body: opts.body,
+			body: opts.body as BodyInit,
 			signal: controller.signal,
 		});
 

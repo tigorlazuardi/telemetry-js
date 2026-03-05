@@ -10,8 +10,9 @@ import {
 } from "@opentelemetry/api";
 import { instrumentFetch } from "../../instrument-fetch.js";
 import { getLogger } from "../../logger.js";
-import { initSDK } from "../../sdk.js";
+import { noopSDKResult } from "../../noop.js";
 import type { LogAttributes, Logger, SDKConfig, SDKResult } from "../../types.js";
+import { cloudflareWorkerAdapter } from "./worker.js";
 
 // Minimal CF types to avoid @cloudflare/workers-types dependency
 interface ExecutionContext {
@@ -86,7 +87,11 @@ let fetchPatched = false;
 
 export function ensureSDK(config: Omit<SDKConfig, "runtime">): SDKResult {
 	if (!sdkResult) {
-		sdkResult = initSDK({ ...config, runtime: "cloudflare-worker" });
+		try {
+			sdkResult = cloudflareWorkerAdapter.setup(config);
+		} catch {
+			sdkResult = noopSDKResult();
+		}
 	}
 	return sdkResult;
 }
@@ -218,7 +223,7 @@ export interface TraceHandlerOptions<T = Response> extends InstrumentOptions {
 
 const headerGetter: TextMapGetter<Headers> = {
 	keys(carrier) {
-		return [...carrier.keys()];
+		return [...(carrier as any).keys()];
 	},
 	get(carrier, key) {
 		return carrier.get(key) ?? undefined;

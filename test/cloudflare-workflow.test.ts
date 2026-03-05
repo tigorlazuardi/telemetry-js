@@ -1,16 +1,20 @@
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock initSDK
-vi.mock("../src/sdk.js", () => ({
-	initSDK: vi.fn().mockReturnValue({
-		resource: { attributes: {} },
-		provider: {},
-		meterProvider: {},
-		logger: { debug() {}, info() {}, warn() {}, error() {} },
-		shutdown: vi.fn().mockResolvedValue(undefined),
-		forceFlush: vi.fn().mockResolvedValue(undefined),
-	}),
+// Mock cloudflareWorkerAdapter
+vi.mock("../src/runtimes/cloudflare/worker.js", () => ({
+	cloudflareWorkerAdapter: {
+		name: "cloudflare-worker",
+		detect: () => true,
+		setup: vi.fn().mockReturnValue({
+			resource: { attributes: {} },
+			provider: {},
+			meterProvider: {},
+			logger: { debug() {}, info() {}, warn() {}, error() {} },
+			shutdown: vi.fn().mockResolvedValue(undefined),
+			forceFlush: vi.fn().mockResolvedValue(undefined),
+		}),
+	},
 }));
 
 // Hoist all variables referenced inside vi.mock factories
@@ -105,6 +109,7 @@ vi.mock("@opentelemetry/api", async () => {
 });
 
 import { _resetInstrumentState } from "../src/runtimes/cloudflare/instrument.js";
+import { cloudflareWorkerAdapter } from "../src/runtimes/cloudflare/worker.js";
 import {
 	extractContext,
 	extractSpan,
@@ -112,7 +117,6 @@ import {
 	injectContext,
 	instrumentWorkflow,
 } from "../src/runtimes/cloudflare/workflow.js";
-import { initSDK } from "../src/sdk.js";
 
 function createMockStep() {
 	return {
@@ -167,12 +171,11 @@ describe("instrumentWorkflow", () => {
 		const instance = new Decorated();
 		await instance.run({ payload: {} }, step);
 
-		expect(initSDK).toHaveBeenCalledWith(
+		expect(cloudflareWorkerAdapter.setup).toHaveBeenCalledWith(
 			expect.objectContaining({
 				serviceName: "my-workflow",
 				exporterEndpoint: "https://otel.example.com",
 				env: mockEnv,
-				runtime: "cloudflare-worker",
 			}),
 		);
 	});
@@ -534,7 +537,9 @@ describe("instrumentWorkflow", () => {
 		const instance = new Decorated();
 		await instance.run({ payload: {} }, step);
 
-		expect(initSDK).toHaveBeenCalledWith(expect.objectContaining({ env: optsEnv }));
+		expect(cloudflareWorkerAdapter.setup).toHaveBeenCalledWith(
+			expect.objectContaining({ env: optsEnv }),
+		);
 
 		vi.clearAllMocks();
 		mockSpans.length = 0;
@@ -545,7 +550,9 @@ describe("instrumentWorkflow", () => {
 		const instance2 = new Decorated2();
 		await instance2.run({ payload: {} }, step);
 
-		expect(initSDK).toHaveBeenCalledWith(expect.objectContaining({ env: instanceEnv }));
+		expect(cloudflareWorkerAdapter.setup).toHaveBeenCalledWith(
+			expect.objectContaining({ env: instanceEnv }),
+		);
 	});
 });
 

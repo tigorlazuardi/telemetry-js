@@ -35,7 +35,6 @@
 
 // Lazily loaded OTel modules (populated on first fetch call)
 let _otel: typeof import("./otel.js") | null = null;
-let _otelLoading: Promise<typeof import("./otel.js")> | null = null;
 
 /* ------------------------------------------------------------------ */
 /*  Original fetch capture                                            */
@@ -73,7 +72,6 @@ export function _resetBrowserFetch(): void {
 	_originalFetch = null;
 	_patched = false;
 	_otel = null;
-	_otelLoading = null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -112,28 +110,13 @@ export function instrumentFetch(): void {
 
 	const realFetch = _originalFetch;
 
-	globalThis.fetch = function instrumentedFetch(
+	globalThis.fetch = async function instrumentedFetch(
 		input: string | URL | Request,
 		init?: RequestInit,
 	): Promise<Response> {
-		// If OTel modules are already loaded, trace synchronously
-		if (_otel) {
-			return _otel.tracedFetch(realFetch, input, init);
+		if (!_otel) {
+			_otel = await import("./otel.js");
 		}
-
-		// Kick off the lazy load (deduplicated)
-		if (!_otelLoading) {
-			_otelLoading = import("./otel.js").then((mod) => {
-				_otel = mod;
-				return mod;
-			});
-		}
-
-		// Race: perform the fetch immediately with the real fetch,
-		// but also wait for OTel to load. If OTel loads before the
-		// fetch completes we still can't retroactively trace it, so
-		// we just do a plain fetch for this first in-flight request.
-		// Subsequent calls will be traced.
-		return realFetch(input instanceof Request ? input : new Request(input, init));
+		return _otel.tracedFetch(realFetch, input, init);
 	};
 }

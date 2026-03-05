@@ -308,102 +308,106 @@ export async function traceHandler<T = Response>(opts: TraceHandlerOptions<T>): 
 			extractedCtx,
 			async (s) => {
 				span = s;
-				const res = await handler();
-				if (res instanceof Response) {
-					span.setAttribute("http.status_code", res.status);
-					if (res.status >= 500) {
-						span.setStatus({ code: SpanStatusCode.ERROR });
+				try {
+					const res = await handler();
+					if (res instanceof Response) {
+						span.setAttribute("http.status_code", res.status);
+						if (res.status >= 500) {
+							span.setStatus({ code: SpanStatusCode.ERROR });
+						}
 					}
+
+					// Inject trace context into response headers when the result is a Response
+					if (res instanceof Response) {
+						const newResponse = new Response(res.body, res);
+						propagation.inject(context.active(), newResponse.headers, headerSetter);
+
+						// Auto-log the request/response (inside span context so logs get span_id/trace_id)
+						if (logger) {
+							const duration = Date.now() - startTime;
+							const responseSize = Number(newResponse.headers.get("content-length") ?? 0);
+
+							// Build log message: [Method] [Path] -- [status] [duration] [size]
+							const message = `${request.method} ${url.pathname} -- ${newResponse.status} ${humanDuration(duration)} ${humanBytes(responseSize)}`;
+
+							// Build attributes
+							const attrs: LogAttributes = {};
+
+							// Request attributes
+							attrs["http.request.method"] = request.method;
+							attrs["http.request.path"] = url.pathname;
+							if (url.search) attrs["http.request.query"] = url.search;
+							const ua = request.headers.get("user-agent");
+							if (ua) attrs["http.request.user_agent"] = ua;
+							attrs["http.request.headers"] = JSON.stringify(
+								redactHeaders(request.headers, sensitiveSet),
+							);
+							const requestBody = await requestBodyPromise;
+							if (requestBody !== undefined) {
+								attrs["http.request.body"] = requestBody;
+							} else if (request.body) {
+								attrs["http.request.body"] = `[${contentTypeSummary(request.headers)}]`;
+							}
+
+							// Response attributes
+							attrs["http.response.status"] = newResponse.status;
+							attrs["http.response.headers"] = JSON.stringify(
+								redactHeaders(newResponse.headers, sensitiveSet),
+							);
+							if (newResponse.body && isLoggableContentType(newResponse.headers)) {
+								const responseBody = await readLimitedBody(newResponse.clone(), maxBodyLogSize);
+								if (responseBody !== undefined) {
+									attrs["http.response.body"] = responseBody;
+								}
+							} else if (newResponse.body) {
+								attrs["http.response.body"] = `[${contentTypeSummary(newResponse.headers)}]`;
+							}
+							attrs["http.response.size"] = humanBytes(responseSize);
+							attrs["http.duration_ms"] = duration;
+
+							if (newResponse.status >= 500) {
+								logger.error(message, attrs);
+							} else if (newResponse.status >= 400) {
+								logger.warn(message, attrs);
+							} else {
+								logger.info(message, attrs);
+							}
+						}
+
+						return newResponse as T;
+					}
+
+					return res;
+				} catch (error) {
+					span.setStatus({
+						code: SpanStatusCode.ERROR,
+						message: error instanceof Error ? error.message : String(error),
+					});
+					span.recordException(error as Error);
+
+					// Log the error (inside span context so logs get span_id/trace_id)
+					if (logger) {
+						const duration = Date.now() - startTime;
+						const message = `${request.method} ${url.pathname} -- FAILED ${humanDuration(duration)}`;
+						const attrs: LogAttributes = {
+							"http.request.method": request.method,
+							"http.request.path": url.pathname,
+							"http.duration_ms": duration,
+							"http.error": error instanceof Error ? error.message : String(error),
+						};
+						if (url.search) attrs["http.request.query"] = url.search;
+						logger.error(message, attrs);
+					}
+
+					throw error;
+				} finally {
+					span.end();
 				}
-				return res;
 			},
 		);
 
-		// Inject trace context into response headers when the result is a Response
-		if (result instanceof Response) {
-			const newResponse = new Response(result.body, result);
-			propagation.inject(context.active(), newResponse.headers, headerSetter);
-
-			// Auto-log the request/response
-			if (logger) {
-				const duration = Date.now() - startTime;
-				const responseSize = Number(newResponse.headers.get("content-length") ?? 0);
-
-				// Build log message: [Method] [Path] -- [status] [duration] [size]
-				const message = `${request.method} ${url.pathname} -- ${newResponse.status} ${humanDuration(duration)} ${humanBytes(responseSize)}`;
-
-				// Build attributes
-				const attrs: LogAttributes = {};
-
-				// Request attributes
-				attrs["http.request.method"] = request.method;
-				attrs["http.request.path"] = url.pathname;
-				if (url.search) attrs["http.request.query"] = url.search;
-				const ua = request.headers.get("user-agent");
-				if (ua) attrs["http.request.user_agent"] = ua;
-				attrs["http.request.headers"] = JSON.stringify(
-					redactHeaders(request.headers, sensitiveSet),
-				);
-				const requestBody = await requestBodyPromise;
-				if (requestBody !== undefined) {
-					attrs["http.request.body"] = requestBody;
-				} else if (request.body) {
-					attrs["http.request.body"] = `[${contentTypeSummary(request.headers)}]`;
-				}
-
-				// Response attributes
-				attrs["http.response.status"] = newResponse.status;
-				attrs["http.response.headers"] = JSON.stringify(
-					redactHeaders(newResponse.headers, sensitiveSet),
-				);
-				if (newResponse.body && isLoggableContentType(newResponse.headers)) {
-					const responseBody = await readLimitedBody(newResponse.clone(), maxBodyLogSize);
-					if (responseBody !== undefined) {
-						attrs["http.response.body"] = responseBody;
-					}
-				} else if (newResponse.body) {
-					attrs["http.response.body"] = `[${contentTypeSummary(newResponse.headers)}]`;
-				}
-				attrs["http.response.size"] = humanBytes(responseSize);
-				attrs["http.duration_ms"] = duration;
-
-				if (newResponse.status >= 500) {
-					logger.error(message, attrs);
-				} else if (newResponse.status >= 400) {
-					logger.warn(message, attrs);
-				} else {
-					logger.info(message, attrs);
-				}
-			}
-
-			return newResponse as T;
-		}
-
 		return result;
-	} catch (error) {
-		span?.setStatus({
-			code: SpanStatusCode.ERROR,
-			message: error instanceof Error ? error.message : String(error),
-		});
-		span?.recordException(error as Error);
-
-		// Log the error
-		if (logger) {
-			const duration = Date.now() - startTime;
-			const message = `${request.method} ${url.pathname} -- FAILED ${humanDuration(duration)}`;
-			const attrs: LogAttributes = {
-				"http.request.method": request.method,
-				"http.request.path": url.pathname,
-				"http.duration_ms": duration,
-				"http.error": error instanceof Error ? error.message : String(error),
-			};
-			if (url.search) attrs["http.request.query"] = url.search;
-			logger.error(message, attrs);
-		}
-
-		throw error;
 	} finally {
-		span?.end();
 		ctx?.waitUntil(
 			(async () => {
 				await sdkResult?.forceFlush();

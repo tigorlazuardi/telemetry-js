@@ -1,4 +1,3 @@
-import { AsyncLocalStorage } from "node:async_hooks";
 import { context, type SpanContext, trace } from "@opentelemetry/api";
 import { logs, SeverityNumber } from "@opentelemetry/api-logs";
 import type { LogAttributes, Logger, LogLevel, LogOptions } from "./types.js";
@@ -11,10 +10,30 @@ const SEVERITY: Record<LogLevel, SeverityNumber> = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  AsyncLocalStorage-backed logger context                           */
+/*  Logger context (AsyncLocalStorage or module-level fallback)       */
 /* ------------------------------------------------------------------ */
 
-const loggerStorage = new AsyncLocalStorage<Logger>();
+/** Minimal interface matching the AsyncLocalStorage API we need. */
+export interface LoggerStorage<T> {
+	getStore(): T | undefined;
+	run<R>(store: T, fn: () => R): R;
+}
+
+let _loggerStorage: LoggerStorage<Logger> | null = null;
+
+/**
+ * Provide an {@link AsyncLocalStorage} (or compatible) instance for
+ * logger context propagation. Called by runtime adapters during setup.
+ *
+ * In browsers (where `AsyncLocalStorage` is unavailable) this is never
+ * called, and the logger falls back to a module-level variable.
+ */
+export function setLoggerStorage(storage: LoggerStorage<Logger>): void {
+	_loggerStorage = storage;
+}
+
+/** Fallback context-scoped logger for runtimes without AsyncLocalStorage. */
+let _contextLogger: Logger | undefined;
 
 /** Default logger used when no context-scoped logger exists. */
 let _defaultLogger: Logger | undefined;
@@ -29,16 +48,30 @@ let _defaultLogger: Logger | undefined;
  * without threading it through every function signature.
  */
 export function getLogger(): Logger {
-	return loggerStorage.getStore() ?? _defaultLogger ?? createLogger();
+	return _loggerStorage?.getStore() ?? _contextLogger ?? _defaultLogger ?? createLogger();
 }
 
 /**
  * Execute {@link fn} with {@link logger} bound to the
- * {@link AsyncLocalStorage} context so that every nested
- * {@link getLogger} call returns it.
+ * current async context so that every nested {@link getLogger}
+ * call returns it.
+ *
+ * Uses `AsyncLocalStorage` on Node.js / Cloudflare Workers.
+ * In browsers (where `AsyncLocalStorage` is unavailable) the logger
+ * is stored in a module-level variable for the duration of {@link fn}.
  */
 export function runWithLogger<T>(logger: Logger, fn: () => T): T {
-	return loggerStorage.run(logger, fn);
+	if (_loggerStorage) {
+		return _loggerStorage.run(logger, fn);
+	}
+	// Fallback for browsers: simple module-level swap
+	const prev = _contextLogger;
+	_contextLogger = logger;
+	try {
+		return fn();
+	} finally {
+		_contextLogger = prev;
+	}
 }
 
 /**

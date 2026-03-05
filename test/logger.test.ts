@@ -27,8 +27,18 @@ vi.mock("@opentelemetry/api", () => ({
 	},
 }));
 
-import { createLogger, getLogger, runWithLogger, setDefaultLogger } from "../src/logger.js";
+import { AsyncLocalStorage } from "node:async_hooks";
+import {
+	createLogger,
+	getLogger,
+	runWithLogger,
+	setDefaultLogger,
+	setLoggerStorage,
+} from "../src/logger.js";
 import { noopLogger } from "../src/noop.js";
+
+// Register AsyncLocalStorage for tests (simulates what runtime adapters do)
+setLoggerStorage(new AsyncLocalStorage());
 
 describe("createLogger", () => {
 	let stderrSpy: ReturnType<typeof vi.spyOn>;

@@ -51,7 +51,7 @@ import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { detectCloudflareWorker } from "../../detect.js";
 import { resolveSignalEndpoint } from "../../endpoints.js";
 import { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "../../exporters.js";
-import { createLogger, getLogger, setDefaultLogger } from "../../logger.js";
+import { createLogger, getLogger, setDefaultLogger, setLoggerStorage } from "../../logger.js";
 import { noopSDKResult } from "../../noop.js";
 import { buildResource } from "../../resource.js";
 import type { RuntimeAdapter, SDKConfig, SDKResult } from "../../types.js";
@@ -120,6 +120,9 @@ export const cloudflareWorkerAdapter: RuntimeAdapter = {
 			// the OTel API falls back to NoopContextManager and trace correlation
 			// (trace_id / span_id on logs) silently breaks.
 			context.setGlobalContextManager(new CloudflareContextManager());
+
+			// Register AsyncLocalStorage for logger context propagation.
+			setLoggerStorage(new AsyncLocalStorage());
 
 			const tracesEndpoint = resolveSignalEndpoint("traces", config);
 			const metricsEndpoint = resolveSignalEndpoint("metrics", config);

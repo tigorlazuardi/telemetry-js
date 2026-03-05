@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { metrics, trace } from "@opentelemetry/api";
 import { logs } from "@opentelemetry/api-logs";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
@@ -10,7 +11,11 @@ import { NodeSDK } from "@opentelemetry/sdk-node";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { detectNode } from "../detect.js";
 import { resolveSignalEndpoint } from "../endpoints.js";
-import { createLogger, setDefaultLogger } from "../logger.js";
+import { createLogger, setDefaultLogger, setLoggerStorage } from "../logger.js";
+
+// Register AsyncLocalStorage for logger context propagation.
+setLoggerStorage(new AsyncLocalStorage());
+
 import { noopSDKResult } from "../noop.js";
 import { buildResource } from "../resource.js";
 import type { RuntimeAdapter, SDKConfig, SDKResult } from "../types.js";

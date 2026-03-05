@@ -22,17 +22,6 @@ vi.mock("@opentelemetry/otlp-transformer", () => ({
 
 const mockFetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
 
-// Mock getOriginalFetch to return our mockFetch
-vi.mock("../src/instrument-fetch.js", async () => {
-	const actual = await vi.importActual<typeof import("../src/instrument-fetch.js")>(
-		"../src/instrument-fetch.js",
-	);
-	return {
-		...actual,
-		getOriginalFetch: () => mockFetch,
-	};
-});
-
 import { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "../src/exporters.js";
 
 beforeEach(() => {
@@ -48,6 +37,7 @@ describe("FetchTraceExporter", () => {
 	it("sends spans via fetch POST to configured URL", async () => {
 		const exporter = new FetchTraceExporter({
 			url: "https://otel.example.com/v1/traces",
+			fetchFn: () => mockFetch as unknown as typeof fetch,
 		});
 
 		const result = await new Promise<{ code: number }>((resolve) => {
@@ -67,6 +57,7 @@ describe("FetchTraceExporter", () => {
 		const exporter = new FetchTraceExporter({
 			url: "https://otel.example.com/v1/traces",
 			headers: { "X-API-Key": "secret" },
+			fetchFn: () => mockFetch as unknown as typeof fetch,
 		});
 
 		await new Promise<{ code: number }>((resolve) => {
@@ -84,6 +75,7 @@ describe("FetchTraceExporter", () => {
 
 		const exporter = new FetchTraceExporter({
 			url: "https://otel.example.com/v1/traces",
+			fetchFn: () => mockFetch as unknown as typeof fetch,
 		});
 
 		const result = await new Promise<{ code: number; error?: Error }>((resolve) => {
@@ -99,6 +91,7 @@ describe("FetchTraceExporter", () => {
 
 		const exporter = new FetchTraceExporter({
 			url: "https://otel.example.com/v1/traces",
+			fetchFn: () => mockFetch as unknown as typeof fetch,
 		});
 
 		const result = await new Promise<{ code: number; error?: Error }>((resolve) => {
@@ -112,6 +105,7 @@ describe("FetchTraceExporter", () => {
 	it("returns FAILED after shutdown", async () => {
 		const exporter = new FetchTraceExporter({
 			url: "https://otel.example.com/v1/traces",
+			fetchFn: () => mockFetch as unknown as typeof fetch,
 		});
 
 		await exporter.shutdown();
@@ -130,6 +124,7 @@ describe("FetchLogExporter", () => {
 	it("sends logs via fetch POST", async () => {
 		const exporter = new FetchLogExporter({
 			url: "https://otel.example.com/v1/logs",
+			fetchFn: () => mockFetch as unknown as typeof fetch,
 		});
 
 		const result = await new Promise<{ code: number }>((resolve) => {
@@ -143,6 +138,7 @@ describe("FetchLogExporter", () => {
 	it("deduplicates timestamps — bumps colliding entries by 1ms", async () => {
 		const exporter = new FetchLogExporter({
 			url: "https://otel.example.com/v1/logs",
+			fetchFn: () => mockFetch as unknown as typeof fetch,
 		});
 
 		const logs = [
@@ -164,6 +160,7 @@ describe("FetchLogExporter", () => {
 	it("handles nanosecond overflow when bumping timestamps", async () => {
 		const exporter = new FetchLogExporter({
 			url: "https://otel.example.com/v1/logs",
+			fetchFn: () => mockFetch as unknown as typeof fetch,
 		});
 
 		const logs = [
@@ -183,6 +180,7 @@ describe("FetchLogExporter", () => {
 	it("does not bump if timestamps are already ordered", async () => {
 		const exporter = new FetchLogExporter({
 			url: "https://otel.example.com/v1/logs",
+			fetchFn: () => mockFetch as unknown as typeof fetch,
 		});
 
 		const logs = [
@@ -204,6 +202,7 @@ describe("FetchLogExporter", () => {
 	it("returns FAILED after shutdown", async () => {
 		const exporter = new FetchLogExporter({
 			url: "https://otel.example.com/v1/logs",
+			fetchFn: () => mockFetch as unknown as typeof fetch,
 		});
 
 		await exporter.shutdown();
@@ -221,6 +220,7 @@ describe("FetchMetricExporter", () => {
 	it("sends metrics via fetch POST", async () => {
 		const exporter = new FetchMetricExporter({
 			url: "https://otel.example.com/v1/metrics",
+			fetchFn: () => mockFetch as unknown as typeof fetch,
 		});
 
 		const result = await new Promise<{ code: number }>((resolve) => {
@@ -234,6 +234,7 @@ describe("FetchMetricExporter", () => {
 	it("returns FAILED after shutdown", async () => {
 		const exporter = new FetchMetricExporter({
 			url: "https://otel.example.com/v1/metrics",
+			fetchFn: () => mockFetch as unknown as typeof fetch,
 		});
 
 		await exporter.shutdown();

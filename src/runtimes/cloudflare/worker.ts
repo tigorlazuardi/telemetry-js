@@ -51,6 +51,7 @@ import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { detectCloudflareWorker } from "../../detect.js";
 import { resolveSignalEndpoint } from "../../endpoints.js";
 import { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "../../exporters.js";
+import { getOriginalFetch } from "../../instrument-fetch.js";
 import { createLogger, getLogger, setDefaultLogger, setLoggerStorage } from "../../logger.js";
 import { noopSDKResult } from "../../noop.js";
 import { buildResource } from "../../resource.js";
@@ -134,6 +135,7 @@ export const cloudflareWorkerAdapter: RuntimeAdapter = {
 				const traceExporter = new FetchTraceExporter({
 					url: tracesEndpoint,
 					headers: config.exporterHeaders,
+					fetchFn: getOriginalFetch,
 				});
 
 				provider = new BasicTracerProvider({
@@ -157,6 +159,7 @@ export const cloudflareWorkerAdapter: RuntimeAdapter = {
 				const metricExporter = new FetchMetricExporter({
 					url: metricsEndpoint,
 					headers: config.exporterHeaders,
+					fetchFn: getOriginalFetch,
 				});
 
 				const metricReader = new PeriodicExportingMetricReader({
@@ -178,6 +181,7 @@ export const cloudflareWorkerAdapter: RuntimeAdapter = {
 				const logExporter = new FetchLogExporter({
 					url: logsEndpoint,
 					headers: config.exporterHeaders,
+					fetchFn: getOriginalFetch,
 				});
 
 				loggerProvider = new LoggerProvider({

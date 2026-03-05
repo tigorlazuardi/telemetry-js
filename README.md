@@ -28,11 +28,12 @@ Pino is an optional peer dependency — the SDK falls back to a built-in formatt
 
 Import from the subpath that matches your runtime. Each subpath only bundles the adapter code for that runtime — the others are never pulled in.
 
-| Subpath | Runtime | Exporters |
+| Subpath | Runtime | Description |
 | --- | --- | --- |
-| `@tigorhutasuhut/telemetry-js/cloudflare` | Cloudflare Workers | Fetch-based (browser-native) |
-| `@tigorhutasuhut/telemetry-js/node` | Node.js / Bun | OTel HTTP (`@opentelemetry/exporter-*-otlp-http`) |
-| `@tigorhutasuhut/telemetry-js/browser` | Browser (Vite, etc.) | Fetch-based (browser-native) |
+| `@tigorhutasuhut/telemetry-js/cloudflare` | Cloudflare Workers | Full SDK with fetch-based exporters |
+| `@tigorhutasuhut/telemetry-js/node` | Node.js / Bun | Full SDK with OTel HTTP exporters |
+| `@tigorhutasuhut/telemetry-js/browser` | Browser (Vite, etc.) | Full SDK with fetch-based exporters |
+| `@tigorhutasuhut/telemetry-js/browser/fetch` | Browser | Lightweight `instrumentFetch()` only (~2 KB, zero OTel deps at import time) |
 
 > **Breaking change (v1.0.0):** The root import `@tigorhutasuhut/telemetry-js` is removed. Use a runtime-specific subpath instead.
 
@@ -76,17 +77,52 @@ Cloudflare Workers use fetch-based OTLP exporters that bypass Node.js `http`/`ht
 
 ## Quick Start — Browser
 
-```ts
-import { initSDK } from "@tigorhutasuhut/telemetry-js/browser";
+Libraries like Hono `hc`, better-auth, and TanStack Query may capture a reference to `globalThis.fetch` at **module load time**. If the SDK patches `fetch` after those modules load, outgoing requests will bypass instrumentation silently.
 
-const sdk = initSDK({
-  serviceName: import.meta.env.VITE_OTEL_SERVICE_NAME,
-  exporterEndpoint: import.meta.env.VITE_OTEL_EXPORTER_OTLP_ENDPOINT,
-  resourceAttributes: {
-    "deployment.environment.name": import.meta.env.VITE_OTEL_DEPLOYMENT_ENV,
-    "service.namespace": import.meta.env.VITE_OTEL_SERVICE_NAMESPACE,
-  },
-});
+Split initialisation into two phases to guarantee every `fetch` call is traced:
+
+```ts
+// main.tsx
+
+// 1. EAGER — patch globalThis.fetch synchronously, before ANY other import.
+//    This subpath is lightweight (~2 KB) and has zero @opentelemetry deps
+//    at import time. OTel tracing code is loaded lazily via dynamic import()
+//    on the first fetch() call — by then the browser has already cached all
+//    chunks, so tracing kicks in instantly.
+import { instrumentFetch } from "@tigorhutasuhut/telemetry-js/browser/fetch";
+instrumentFetch();
+
+// 2. LAZY — full SDK setup, fire-and-forget.
+//    Registers TracerProvider, propagators, and exporters.
+//    Detects that instrumentFetch() was already called and skips a
+//    redundant patch.
+import("./lib/telemetry").then(({ initTelemetry }) =>
+  initTelemetry({
+    endpoint: import.meta.env.VITE_OTLP_ENDPOINT,
+    enabled: true,
+  }),
+);
+
+// ... rest of your app (React root, router, etc.)
+```
+
+Then in your telemetry wrapper (`lib/telemetry.ts`):
+
+```ts
+import { initSDK, type SDKConfig } from "@tigorhutasuhut/telemetry-js/browser";
+
+export function initTelemetry(config: { endpoint: string; enabled?: boolean }) {
+  if (!config.enabled) return;
+
+  initSDK({
+    serviceName: import.meta.env.VITE_OTEL_SERVICE_NAME ?? "my-spa",
+    exporterEndpoint: config.endpoint,
+    resourceAttributes: {
+      "deployment.environment.name": import.meta.env.VITE_OTEL_DEPLOYMENT_ENV,
+      "service.namespace": import.meta.env.VITE_OTEL_SERVICE_NAMESPACE,
+    },
+  });
+}
 ```
 
 Vite replaces `import.meta.env.VITE_*` with string literals at build time, so these values are baked into the bundle — no runtime env lookup needed.
@@ -95,10 +131,12 @@ Define the variables in your `.env` file:
 
 ```env
 VITE_OTEL_SERVICE_NAME=my-spa
-VITE_OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.example.com
+VITE_OTLP_ENDPOINT=https://otel.example.com
 VITE_OTEL_DEPLOYMENT_ENV=production
 VITE_OTEL_SERVICE_NAMESPACE=my-team
 ```
+
+Before the `TracerProvider` is registered by `initSDK`, the OTel API returns a noop tracer — `fetch` works normally, just without tracing. Once the provider is up, every subsequent `fetch` call produces real CLIENT spans with W3C `traceparent`/`tracestate` header injection.
 
 ## `traceHandler` — Non-Standard Entrypoints
 
@@ -276,14 +314,29 @@ OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=production,service.namespac
 > **Note:** You do NOT need to call `instrumentFetch` manually in most cases.
 > - **Node.js**: Use auto-instrumentation packages like `@opentelemetry/instrumentation-http`.
 > - **Cloudflare Workers**: `instrument()` and `traceHandler()` automatically monkey-patch `globalThis.fetch`.
+> - **Browser**: Call `instrumentFetch()` from `browser/fetch` as early as possible in your entry point (see [Quick Start — Browser](#quick-start--browser)).
 
-For manual use in other runtimes:
+### Browser
+
+```ts
+// main.tsx — FIRST import
+import { instrumentFetch } from "@tigorhutasuhut/telemetry-js/browser/fetch";
+instrumentFetch();
+```
+
+The `browser/fetch` subpath is ~2 KB with zero `@opentelemetry` imports at the top level. OTel tracing code is loaded lazily on first `fetch()` call. If `initSDK` is called later, it detects the existing patch and skips re-patching.
+
+### Cloudflare Workers
+
+For manual use outside of `instrument()` / `traceHandler()`:
 
 ```ts
 import { instrumentFetch } from "@tigorhutasuhut/telemetry-js/cloudflare";
 
 instrumentFetch(); // Patches globalThis.fetch
 ```
+
+### `getOriginalFetch`
 
 Use `getOriginalFetch()` to access the unpatched fetch (e.g. for OTLP export calls that should not be traced):
 

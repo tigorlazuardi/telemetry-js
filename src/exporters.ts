@@ -6,11 +6,16 @@
  * Runtimes like Cloudflare Workers and browsers do **not** support these
  * modules, so the exports silently fail at runtime.
  *
- * These lightweight exporters use the **un-instrumented** `fetch` obtained
- * via {@link getOriginalFetch} to avoid infinite export loops when
- * `globalThis.fetch` has been monkey-patched by {@link instrumentFetch}.
+ * Each exporter accepts an optional `fetchFn` resolver that returns the
+ * **un-instrumented** `fetch` to use for export calls.  This avoids the
+ * infinite loop: export → instrumented fetch → new span → export …
  *
- * Used by both the Cloudflare Worker adapter and the browser adapter.
+ * - **Cloudflare Workers** — pass `getOriginalFetch` from `instrument-fetch.ts`
+ * - **Browser** — pass `getOriginalFetch` from `instrument-fetch-browser.ts`
+ *
+ * When no `fetchFn` is provided the exporter falls back to
+ * `globalThis.fetch` directly (which is fine if fetch has not been
+ * monkey-patched, e.g. in tests).
  */
 
 import { type ExportResult, ExportResultCode } from "@opentelemetry/core";
@@ -22,7 +27,6 @@ import {
 import type { ReadableLogRecord } from "@opentelemetry/sdk-logs";
 import type { ResourceMetrics } from "@opentelemetry/sdk-metrics";
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
-import { getOriginalFetch } from "./instrument-fetch.js";
 
 /* ------------------------------------------------------------------ */
 /*  Shared fetch transport                                            */
@@ -33,6 +37,7 @@ interface FetchSendOptions {
 	headers?: Record<string, string>;
 	body: Uint8Array | undefined;
 	timeoutMs?: number;
+	fetchFn?: () => typeof fetch;
 }
 
 async function fetchSend(opts: FetchSendOptions): Promise<ExportResult> {
@@ -45,7 +50,7 @@ async function fetchSend(opts: FetchSendOptions): Promise<ExportResult> {
 	const timer = setTimeout(() => controller.abort(), timeout);
 
 	try {
-		const rawFetch = getOriginalFetch();
+		const rawFetch = opts.fetchFn ? opts.fetchFn() : globalThis.fetch;
 		const response = await rawFetch(opts.url, {
 			method: "POST",
 			headers: {
@@ -82,6 +87,14 @@ export interface FetchExporterConfig {
 	url: string;
 	headers?: Record<string, string>;
 	timeoutMs?: number;
+	/**
+	 * Resolver that returns the **un-instrumented** `fetch` to use for
+	 * export calls.  Pass `getOriginalFetch` from the appropriate
+	 * `instrument-fetch-*` module for your runtime.
+	 *
+	 * Falls back to `globalThis.fetch` when omitted.
+	 */
+	fetchFn?: () => typeof fetch;
 }
 
 /**
@@ -91,12 +104,14 @@ export class FetchTraceExporter {
 	private _url: string;
 	private _headers: Record<string, string>;
 	private _timeoutMs: number;
+	private _fetchFn?: () => typeof fetch;
 	private _shutdown = false;
 
 	constructor(config: FetchExporterConfig) {
 		this._url = config.url;
 		this._headers = config.headers ?? {};
 		this._timeoutMs = config.timeoutMs ?? 30_000;
+		this._fetchFn = config.fetchFn;
 	}
 
 	export(spans: ReadableSpan[], resultCallback: (result: ExportResult) => void): void {
@@ -111,6 +126,7 @@ export class FetchTraceExporter {
 			headers: this._headers,
 			body,
 			timeoutMs: this._timeoutMs,
+			fetchFn: this._fetchFn,
 		}).then(resultCallback, (error) => resultCallback({ code: ExportResultCode.FAILED, error }));
 	}
 
@@ -139,12 +155,14 @@ export class FetchLogExporter {
 	private _url: string;
 	private _headers: Record<string, string>;
 	private _timeoutMs: number;
+	private _fetchFn?: () => typeof fetch;
 	private _shutdown = false;
 
 	constructor(config: FetchExporterConfig) {
 		this._url = config.url;
 		this._headers = config.headers ?? {};
 		this._timeoutMs = config.timeoutMs ?? 30_000;
+		this._fetchFn = config.fetchFn;
 	}
 
 	export(logs: ReadableLogRecord[], resultCallback: (result: ExportResult) => void): void {
@@ -161,6 +179,7 @@ export class FetchLogExporter {
 			headers: this._headers,
 			body,
 			timeoutMs: this._timeoutMs,
+			fetchFn: this._fetchFn,
 		}).then(resultCallback, (error) => resultCallback({ code: ExportResultCode.FAILED, error }));
 	}
 
@@ -208,12 +227,14 @@ export class FetchMetricExporter {
 	private _url: string;
 	private _headers: Record<string, string>;
 	private _timeoutMs: number;
+	private _fetchFn?: () => typeof fetch;
 	private _shutdown = false;
 
 	constructor(config: FetchExporterConfig) {
 		this._url = config.url;
 		this._headers = config.headers ?? {};
 		this._timeoutMs = config.timeoutMs ?? 30_000;
+		this._fetchFn = config.fetchFn;
 	}
 
 	export(metrics: ResourceMetrics, resultCallback: (result: ExportResult) => void): void {
@@ -228,6 +249,7 @@ export class FetchMetricExporter {
 			headers: this._headers,
 			body,
 			timeoutMs: this._timeoutMs,
+			fetchFn: this._fetchFn,
 		}).then(resultCallback, (error) => resultCallback({ code: ExportResultCode.FAILED, error }));
 	}
 

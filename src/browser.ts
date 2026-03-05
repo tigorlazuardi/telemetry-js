@@ -9,6 +9,52 @@
  * adapter code is never pulled in, ensuring a clean tree-shake.
  *
  * Uses fetch-based OTLP exporters which are browser-native and lightweight.
+ *
+ * ## Recommended setup — eager fetch patch, lazy SDK init
+ *
+ * Libraries like Hono `hc`, better-auth, and TanStack Query may capture a
+ * reference to `globalThis.fetch` at **module load time**.  If the SDK
+ * monkey-patches `fetch` after those modules have loaded, outgoing
+ * requests will bypass instrumentation.
+ *
+ * To guarantee every `fetch` call is traced, split initialisation into two
+ * phases:
+ *
+ * ### 1. Eager — patch `globalThis.fetch` synchronously (first import)
+ *
+ * ```ts
+ * // main.tsx — very first lines, before ANY other import
+ * import { instrumentFetch } from "@tigorhutasuhut/telemetry-js/browser/fetch";
+ * instrumentFetch();
+ * ```
+ *
+ * Use the `/browser/fetch` subpath — it exports **only** `instrumentFetch`
+ * and does NOT pull in `@opentelemetry/*`, exporters, providers, or any
+ * other SDK code.  The OTel tracing code is loaded lazily (via dynamic
+ * `import()`) only when the first `fetch()` is actually made.  By that
+ * point the browser has already parallel-loaded and cached all chunks,
+ * so tracing kicks in instantly.
+ *
+ * ### 2. Lazy — full SDK setup via dynamic import (fire-and-forget)
+ *
+ * ```ts
+ * // Still in main.tsx, after the eager patch
+ * import("./lib/telemetry").then(({ initTelemetry }) =>
+ *   initTelemetry({
+ *     endpoint: import.meta.env.VITE_OTLP_ENDPOINT,
+ *     enabled: true,
+ *   }),
+ * );
+ * ```
+ *
+ * `initTelemetry` (your app wrapper around `initSDK`) registers the
+ * `TracerProvider`, propagators, and exporters.  `initSDK` automatically
+ * detects that `instrumentFetch()` was already called and skips a
+ * redundant patch.
+ *
+ * Before the `TracerProvider` is registered, the OTel API returns a noop
+ * tracer — `fetch` still works normally, just without tracing.  Once the
+ * provider is up, every subsequent `fetch` call produces real spans.
  */
 
 import type { Resource } from "@opentelemetry/resources";
@@ -57,6 +103,7 @@ export type { Resource } from "@opentelemetry/resources";
 export { normalizeEndpoint, resolveSignalEndpoint } from "./endpoints.js";
 export type { FetchExporterConfig } from "./exporters.js";
 export { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "./exporters.js";
+export { instrumentFetch } from "./instrument-fetch-browser.js";
 export { createLogger, getLogger, runWithLogger, setDefaultLogger } from "./logger.js";
 export { noopLogger, noopSDKResult } from "./noop.js";
 export type { TracedCallContext, TracedInput } from "./traced.js";

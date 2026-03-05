@@ -34,6 +34,16 @@
 				"types": "./dist/browser.d.cts",
 				"default": "./dist/browser.cjs"
 			}
+		},
+		"./browser/fetch": {
+			"import": {
+				"types": "./dist/browser-fetch.d.ts",
+				"default": "./dist/browser-fetch.js"
+			},
+			"require": {
+				"types": "./dist/browser-fetch.d.cts",
+				"default": "./dist/browser-fetch.cjs"
+			}
 		}
 	},
 	"files": [

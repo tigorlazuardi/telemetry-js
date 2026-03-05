@@ -31,7 +31,7 @@ import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { detectBrowser } from "../detect.js";
 import { resolveSignalEndpoint } from "../endpoints.js";
 import { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "../exporters.js";
-import { instrumentFetch } from "../instrument-fetch.js";
+import { getOriginalFetch, instrumentFetch, isFetchPatched } from "../instrument-fetch-browser.js";
 import { createLogger, setDefaultLogger } from "../logger.js";
 import { noopSDKResult } from "../noop.js";
 import { buildResource } from "../resource.js";
@@ -55,6 +55,7 @@ export const browserAdapter: RuntimeAdapter = {
 				const traceExporter = new FetchTraceExporter({
 					url: tracesEndpoint,
 					headers: config.exporterHeaders,
+					fetchFn: getOriginalFetch,
 				});
 
 				provider = new BasicTracerProvider({
@@ -74,7 +75,10 @@ export const browserAdapter: RuntimeAdapter = {
 
 			// Monkey-patch globalThis.fetch so outgoing requests are traced
 			// and W3C trace context headers are injected automatically.
-			globalThis.fetch = instrumentFetch(globalThis.fetch);
+			// Skip if the consumer already called instrumentFetch() eagerly.
+			if (!isFetchPatched()) {
+				instrumentFetch();
+			}
 
 			// Meter provider
 			let meterProvider: MeterProvider | undefined;
@@ -82,6 +86,7 @@ export const browserAdapter: RuntimeAdapter = {
 				const metricExporter = new FetchMetricExporter({
 					url: metricsEndpoint,
 					headers: config.exporterHeaders,
+					fetchFn: getOriginalFetch,
 				});
 
 				const metricReader = new PeriodicExportingMetricReader({
@@ -103,6 +108,7 @@ export const browserAdapter: RuntimeAdapter = {
 				const logExporter = new FetchLogExporter({
 					url: logsEndpoint,
 					headers: config.exporterHeaders,
+					fetchFn: getOriginalFetch,
 				});
 
 				loggerProvider = new LoggerProvider({

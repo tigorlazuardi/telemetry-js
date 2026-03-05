@@ -15,7 +15,12 @@ const _perf = _perfHooksPerf as unknown as Record<string, unknown>;
 if (_perf && typeof _perf.timeOrigin !== "number") {
 	const _gp = globalThis.performance;
 	if (_gp) {
-		_perf.timeOrigin = _gp.timeOrigin;
+		// Round timeOrigin to millisecond precision. The raw value is a
+		// high-resolution float (e.g. 1741210138567.123) and when OTel
+		// converts `timeOrigin + now()` to nanoseconds, the excess decimal
+		// digits cause floating-point precision loss that inflates span
+		// durations by hundreds of milliseconds.
+		_perf.timeOrigin = Math.round(_gp.timeOrigin);
 		if (typeof _perf.now !== "function") {
 			_perf.now = _gp.now.bind(_gp);
 		}

@@ -419,6 +419,7 @@ export function instrument<Env = unknown>(
 	opts?: InstrumentOptions,
 ): ExportedHandler<Env> {
 	const sdkConfig = opts ?? {};
+	sdkConfig.env = sdkConfig.env || process.env || {};
 	const result: ExportedHandler<Env> = {};
 
 	if (handler.fetch) {

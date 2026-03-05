@@ -17,11 +17,22 @@ import {
 	trace,
 } from "@opentelemetry/api";
 
-const headerSetter: TextMapSetter<Headers> = {
+const headerSetter: TextMapSetter<Record<string, string>> = {
 	set(carrier, key, value) {
-		carrier.set(key, value);
+		carrier[key] = value;
 	},
 };
+
+/**
+ * Extract method and URL from fetch arguments without constructing a
+ * Request object (avoids header guard / body consumption issues).
+ */
+function parseFetchArgs(input: string | URL | Request, init?: RequestInit) {
+	if (input instanceof Request) {
+		return { method: init?.method ?? input.method, url: input.url };
+	}
+	return { method: init?.method ?? "GET", url: String(input) };
+}
 
 /**
  * Execute a fetch call wrapped in an OTel CLIENT span with W3C trace
@@ -35,27 +46,32 @@ export function tracedFetch(
 	input: string | URL | Request,
 	init?: RequestInit,
 ): Promise<Response> {
-	const request = new Request(input, init);
-	const method = request.method;
-	const url = request.url;
+	const { method, url } = parseFetchArgs(input, init);
 	const tracer = trace.getTracer("fetch");
 
 	return tracer.startActiveSpan(`${method} ${url}`, { kind: SpanKind.CLIENT }, async (span) => {
 		try {
-			// Inject trace context into outgoing headers
-			propagation.inject(context.active(), request.headers, headerSetter);
+			// Inject trace context into a plain object, then merge with
+			// any existing headers the caller provided.  This avoids the
+			// Request header-guard issue where .set() silently drops
+			// non-simple headers in no-cors mode.
+			const propagationHeaders: Record<string, string> = {};
+			propagation.inject(context.active(), propagationHeaders, headerSetter);
 
-			const response = await realFetch(request);
+			const mergedInit: RequestInit = {
+				...init,
+				headers: {
+					...Object.fromEntries(new Headers(init?.headers).entries()),
+					...(input instanceof Request ? Object.fromEntries(input.headers.entries()) : {}),
+					...propagationHeaders,
+				},
+			};
+
+			const response = await realFetch(input instanceof Request ? input.url : input, mergedInit);
 
 			span.setAttribute("http.status_code", response.status);
 			if (response.status >= 500) {
 				span.setStatus({ code: SpanStatusCode.ERROR });
-			}
-
-			// Record response traceparent if present
-			const responseTraceparent = response.headers.get("traceparent");
-			if (responseTraceparent) {
-				span.setAttribute("http.response.traceparent", responseTraceparent);
 			}
 
 			return response;

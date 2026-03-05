@@ -45,11 +45,11 @@ import { BasicTracerProvider, SimpleSpanProcessor } from "@opentelemetry/sdk-tra
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { detectCloudflareWorker } from "../../detect.js";
 import { resolveSignalEndpoint } from "../../endpoints.js";
+import { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "../../exporters.js";
 import { createLogger, setDefaultLogger } from "../../logger.js";
 import { noopSDKResult } from "../../noop.js";
 import { buildResource } from "../../resource.js";
 import type { RuntimeAdapter, SDKConfig, SDKResult } from "../../types.js";
-import { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "./fetch-exporter.js";
 
 /**
  * Lightweight {@link ContextManager} backed by {@link AsyncLocalStorage}.
@@ -74,7 +74,7 @@ class CloudflareContextManager implements ContextManager {
 		...args: A
 	): ReturnType<F> {
 		const cb = thisArg == null ? fn : fn.bind(thisArg);
-		return this._storage.run(ctx, cb as () => ReturnType<F>, ...args);
+		return this._storage.run(ctx, cb as (...a: any[]) => ReturnType<F>, ...(args as any[]));
 	}
 
 	bind<T>(ctx: Context, target: T): T {

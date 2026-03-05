@@ -33,11 +33,7 @@ vi.mock("../src/instrument-fetch.js", async () => {
 	};
 });
 
-import {
-	FetchLogExporter,
-	FetchMetricExporter,
-	FetchTraceExporter,
-} from "../src/runtimes/cloudflare/fetch-exporter.js";
+import { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "../src/exporters.js";
 
 beforeEach(() => {
 	mockFetch.mockReset();

@@ -1,16 +1,16 @@
 /**
- * Fetch-based OTLP exporters for Cloudflare Workers.
+ * Fetch-based OTLP exporters for non-Node runtimes.
  *
  * The official `@opentelemetry/exporter-*-otlp-http` packages use Node.js
  * `http`/`https` modules under the hood (the "node" platform variant).
- * Cloudflare Workers do **not** support these modules — even with
- * `nodejs_compat` — so the exports silently fail at runtime.
+ * Runtimes like Cloudflare Workers and browsers do **not** support these
+ * modules, so the exports silently fail at runtime.
  *
- * These exporters use the **un-instrumented** `fetch` obtained via
- * {@link getOriginalFetch} to avoid infinite export loops when
+ * These lightweight exporters use the **un-instrumented** `fetch` obtained
+ * via {@link getOriginalFetch} to avoid infinite export loops when
  * `globalThis.fetch` has been monkey-patched by {@link instrumentFetch}.
  *
- * @internal
+ * Used by both the Cloudflare Worker adapter and the browser adapter.
  */
 
 import { type ExportResult, ExportResultCode } from "@opentelemetry/core";
@@ -22,7 +22,7 @@ import {
 import type { ReadableLogRecord } from "@opentelemetry/sdk-logs";
 import type { ResourceMetrics } from "@opentelemetry/sdk-metrics";
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
-import { getOriginalFetch } from "../../instrument-fetch.js";
+import { getOriginalFetch } from "./instrument-fetch.js";
 
 /* ------------------------------------------------------------------ */
 /*  Shared fetch transport                                            */
@@ -86,7 +86,6 @@ export interface FetchExporterConfig {
 
 /**
  * OTLP/HTTP span exporter that uses `fetch` instead of Node `http` module.
- * @internal
  */
 export class FetchTraceExporter {
 	private _url: string;
@@ -135,8 +134,6 @@ export class FetchTraceExporter {
  * emitted within the same millisecond can arrive at the collector in
  * arbitrary order.  To preserve ordering, each record in a batch whose
  * `hrTime` collides with the previous entry is bumped by 1 ms.
- *
- * @internal
  */
 export class FetchLogExporter {
 	private _url: string;
@@ -206,7 +203,6 @@ function deduplicateTimestamps(logs: ReadableLogRecord[]): void {
 
 /**
  * OTLP/HTTP metric exporter that uses `fetch`.
- * @internal
  */
 export class FetchMetricExporter {
 	private _url: string;

@@ -8,7 +8,7 @@ import type { Resource } from "@opentelemetry/resources";
  * Built-in values are `"node"` and `"cloudflare-worker"`.
  * Any other string is accepted for custom adapters.
  */
-export type RuntimeName = "node" | "cloudflare-worker" | (string & {});
+export type RuntimeName = "node" | "cloudflare-worker" | "browser" | (string & {});
 
 /**
  * Configuration passed to {@link initSDK} to initialise tracing, metrics, and logging.

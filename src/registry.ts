@@ -1,4 +1,5 @@
 import { noopSDKResult } from "./noop.js";
+import { browserAdapter } from "./runtimes/browser.js";
 import { cloudflareWorkerAdapter } from "./runtimes/cloudflare/worker.js";
 import { nodeAdapter } from "./runtimes/node.js";
 import type { RuntimeAdapter, RuntimeName } from "./types.js";
@@ -66,6 +67,8 @@ export function getRegisteredAdapters(): readonly RuntimeAdapter[] {
 	return adapters;
 }
 
-// Pre-register built-in adapters (detection order matters: CF Workers first, then Node)
+// Pre-register built-in adapters.
+// Detection order matters: CF Workers first (most specific), then Node, then browser (most general).
 register(cloudflareWorkerAdapter);
 register(nodeAdapter);
+register(browserAdapter);

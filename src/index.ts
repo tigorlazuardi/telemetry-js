@@ -23,6 +23,8 @@ export { metrics } from "@opentelemetry/api";
 // Resource re-exports
 export type { Resource } from "@opentelemetry/resources";
 export { normalizeEndpoint, resolveSignalEndpoint } from "./endpoints.js";
+export type { FetchExporterConfig } from "./exporters.js";
+export { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "./exporters.js";
 export type { InstrumentFetchConfig } from "./instrument-fetch.js";
 export { getOriginalFetch, instrumentFetch } from "./instrument-fetch.js";
 export { createLogger, getLogger, runWithLogger, setDefaultLogger } from "./logger.js";

@@ -9,20 +9,18 @@ import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
-import { detectNode } from "../detect.js";
-import { resolveSignalEndpoint } from "../endpoints.js";
-import { createLogger, setDefaultLogger, setLoggerStorage } from "../logger.js";
+import { resolveSignalEndpoint } from "../shared/endpoints.js";
+import { createLogger, setDefaultLogger, setLoggerStorage } from "../shared/logger.js";
 
 // Register AsyncLocalStorage for logger context propagation.
 setLoggerStorage(new AsyncLocalStorage());
 
-import { noopSDKResult } from "../noop.js";
-import { buildResource } from "../resource.js";
-import type { RuntimeAdapter, SDKConfig, SDKResult } from "../types.js";
+import { noopSDKResult } from "../shared/noop.js";
+import { buildResource } from "../shared/resource.js";
+import type { RuntimeAdapter, SDKConfig, SDKResult } from "../shared/types.js";
 
 export const nodeAdapter: RuntimeAdapter = {
 	name: "node",
-	detect: detectNode,
 	setup(config: SDKConfig): SDKResult {
 		try {
 			const { resource, warnings } = buildResource(config, [

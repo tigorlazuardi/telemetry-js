@@ -16,4 +16,4 @@
  * pattern (eager fetch patch + lazy SDK init).
  */
 
-export { instrumentFetch } from "./instrument-fetch-browser.js";
+export { instrumentFetch } from "./patch.js";

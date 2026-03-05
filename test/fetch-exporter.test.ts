@@ -22,7 +22,11 @@ vi.mock("@opentelemetry/otlp-transformer", () => ({
 
 const mockFetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
 
-import { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "../src/exporters.js";
+import {
+	FetchLogExporter,
+	FetchMetricExporter,
+	FetchTraceExporter,
+} from "../src/shared/exporters.js";
 
 beforeEach(() => {
 	mockFetch.mockReset();

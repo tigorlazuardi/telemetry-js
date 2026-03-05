@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { normalizeEndpoint, resolveSignalEndpoint } from "../src/endpoints.js";
-import type { SDKConfig } from "../src/types.js";
+import { normalizeEndpoint, resolveSignalEndpoint } from "../src/shared/endpoints.js";
+import type { SDKConfig } from "../src/shared/types.js";
 
 describe("normalizeEndpoint", () => {
 	it("returns undefined for undefined input", () => {

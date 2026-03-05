@@ -95,12 +95,6 @@ export interface RuntimeAdapter {
 	name: RuntimeName;
 
 	/**
-	 * Return `true` if the current process is running in this runtime.
-	 * Called during auto-detection when no explicit `runtime` is provided.
-	 */
-	detect(): boolean;
-
-	/**
 	 * Create providers, processors, and exporters for this runtime.
 	 *
 	 * @param config - SDK configuration supplied by the caller.

@@ -34,8 +34,8 @@
 /* ------------------------------------------------------------------ */
 
 // Lazily loaded OTel modules (populated on first fetch call)
-let _otel: typeof import("./instrument-fetch-browser-otel.js") | null = null;
-let _otelLoading: Promise<typeof import("./instrument-fetch-browser-otel.js")> | null = null;
+let _otel: typeof import("./otel.js") | null = null;
+let _otelLoading: Promise<typeof import("./otel.js")> | null = null;
 
 /* ------------------------------------------------------------------ */
 /*  Original fetch capture                                            */
@@ -123,7 +123,7 @@ export function instrumentFetch(): void {
 
 		// Kick off the lazy load (deduplicated)
 		if (!_otelLoading) {
-			_otelLoading = import("./instrument-fetch-browser-otel.js").then((mod) => {
+			_otelLoading = import("./otel.js").then((mod) => {
 				_otel = mod;
 				return mod;
 			});

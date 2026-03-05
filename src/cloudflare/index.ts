@@ -10,9 +10,9 @@
  */
 
 import type { Resource } from "@opentelemetry/resources";
-import { noopSDKResult } from "./noop.js";
-import { cloudflareWorkerAdapter } from "./runtimes/cloudflare/worker.js";
-import type { SDKConfig, SDKResult } from "./types.js";
+import { noopSDKResult } from "../shared/noop.js";
+import type { SDKConfig, SDKResult } from "../shared/types.js";
+import { cloudflareWorkerAdapter } from "./adapter.js";
 
 /** Module-level reference to the last initialised resource. */
 let _globalResource: Resource | null = null;
@@ -52,15 +52,15 @@ export type {
 } from "@opentelemetry/api";
 export { metrics } from "@opentelemetry/api";
 export type { Resource } from "@opentelemetry/resources";
-export { normalizeEndpoint, resolveSignalEndpoint } from "./endpoints.js";
-export type { FetchExporterConfig } from "./exporters.js";
-export { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "./exporters.js";
-export type { InstrumentFetchConfig } from "./instrument-fetch.js";
-export { getOriginalFetch, instrumentFetch } from "./instrument-fetch.js";
-export { createLogger, getLogger, runWithLogger, setDefaultLogger } from "./logger.js";
-export { noopLogger, noopSDKResult } from "./noop.js";
-export type { TracedCallContext, TracedInput } from "./traced.js";
-export { traced } from "./traced.js";
+export { normalizeEndpoint, resolveSignalEndpoint } from "../shared/endpoints.js";
+export type { FetchExporterConfig } from "../shared/exporters.js";
+export { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "../shared/exporters.js";
+export type { InstrumentFetchConfig } from "../shared/fetch.js";
+export { getOriginalFetch, instrumentFetch } from "../shared/fetch.js";
+export { createLogger, getLogger, runWithLogger, setDefaultLogger } from "../shared/logger.js";
+export { noopLogger, noopSDKResult } from "../shared/noop.js";
+export type { TracedCallContext, TracedInput } from "../shared/traced.js";
+export { traced } from "../shared/traced.js";
 export type {
 	Carrier,
 	LogAttributes,
@@ -72,9 +72,9 @@ export type {
 	RuntimeName,
 	SDKConfig,
 	SDKResult,
-} from "./types.js";
-export type { WithTraceOptions } from "./with-trace.js";
-export { withTrace } from "./with-trace.js";
+} from "../shared/types.js";
+export type { WithTraceOptions } from "../shared/with-trace.js";
+export { withTrace } from "../shared/with-trace.js";
 
 // ── Cloudflare-specific APIs ────────────────────────────────────────────
 
@@ -82,16 +82,16 @@ export type {
 	InstrumentOptions,
 	MinimalExecutionContext,
 	TraceHandlerOptions,
-} from "./runtimes/cloudflare/instrument.js";
-export { instrument, traceHandler } from "./runtimes/cloudflare/instrument.js";
+} from "./instrument.js";
+export { instrument, traceHandler } from "./instrument.js";
 export type {
 	InjectContextOptions,
 	InstrumentWorkflowOptions,
-} from "./runtimes/cloudflare/workflow.js";
+} from "./workflow.js";
 export {
 	extractContext,
 	extractSpan,
 	extractTraceparent,
 	injectContext,
 	instrumentWorkflow,
-} from "./runtimes/cloudflare/workflow.js";
+} from "./workflow.js";

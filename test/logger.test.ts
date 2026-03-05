@@ -34,8 +34,8 @@ import {
 	runWithLogger,
 	setDefaultLogger,
 	setLoggerStorage,
-} from "../src/logger.js";
-import { noopLogger } from "../src/noop.js";
+} from "../src/shared/logger.js";
+import { noopLogger } from "../src/shared/noop.js";
 
 // Register AsyncLocalStorage for tests (simulates what runtime adapters do)
 setLoggerStorage(new AsyncLocalStorage());

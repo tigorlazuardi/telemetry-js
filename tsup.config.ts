@@ -1,7 +1,12 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-	entry: ["src/cloudflare.ts", "src/node.ts", "src/browser.ts", "src/browser-fetch.ts"],
+	entry: {
+		cloudflare: "src/cloudflare/index.ts",
+		node: "src/node/index.ts",
+		browser: "src/browser/index.ts",
+		"browser-fetch": "src/browser/fetch/index.ts",
+	},
 	format: ["esm", "cjs"],
 	dts: true,
 	clean: true,

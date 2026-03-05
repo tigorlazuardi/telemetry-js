@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { mockForceFlush } = vi.hoisted(() => ({
 	mockForceFlush: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock("../src/runtimes/cloudflare/worker.js", () => {
+vi.mock("../src/cloudflare/adapter.js", () => {
 	return {
 		cloudflareWorkerAdapter: {
 			name: "cloudflare-worker",
@@ -69,12 +69,8 @@ vi.mock("@opentelemetry/api", async () => {
 	};
 });
 
-import {
-	_resetInstrumentState,
-	instrument,
-	traceHandler,
-} from "../src/runtimes/cloudflare/instrument.js";
-import { cloudflareWorkerAdapter } from "../src/runtimes/cloudflare/worker.js";
+import { cloudflareWorkerAdapter } from "../src/cloudflare/adapter.js";
+import { _resetInstrumentState, instrument, traceHandler } from "../src/cloudflare/instrument.js";
 
 function createMockCtx() {
 	return {

@@ -37,7 +37,7 @@ vi.mock("@opentelemetry/api", async () => {
 	};
 });
 
-import { withTrace } from "../src/with-trace.js";
+import { withTrace } from "../src/shared/with-trace.js";
 
 describe("withTrace", () => {
 	beforeEach(() => {

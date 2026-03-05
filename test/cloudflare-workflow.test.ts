@@ -2,7 +2,7 @@ import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock cloudflareWorkerAdapter
-vi.mock("../src/runtimes/cloudflare/worker.js", () => ({
+vi.mock("../src/cloudflare/adapter.js", () => ({
 	cloudflareWorkerAdapter: {
 		name: "cloudflare-worker",
 		detect: () => true,
@@ -108,15 +108,15 @@ vi.mock("@opentelemetry/api", async () => {
 	};
 });
 
-import { _resetInstrumentState } from "../src/runtimes/cloudflare/instrument.js";
-import { cloudflareWorkerAdapter } from "../src/runtimes/cloudflare/worker.js";
+import { cloudflareWorkerAdapter } from "../src/cloudflare/adapter.js";
+import { _resetInstrumentState } from "../src/cloudflare/instrument.js";
 import {
 	extractContext,
 	extractSpan,
 	extractTraceparent,
 	injectContext,
 	instrumentWorkflow,
-} from "../src/runtimes/cloudflare/workflow.js";
+} from "../src/cloudflare/workflow.js";
 
 function createMockStep() {
 	return {

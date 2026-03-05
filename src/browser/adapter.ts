@@ -28,18 +28,16 @@ import { LoggerProvider, SimpleLogRecordProcessor } from "@opentelemetry/sdk-log
 import { MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { BasicTracerProvider, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
-import { detectBrowser } from "../detect.js";
-import { resolveSignalEndpoint } from "../endpoints.js";
-import { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "../exporters.js";
-import { getOriginalFetch, instrumentFetch, isFetchPatched } from "../instrument-fetch-browser.js";
-import { createLogger, setDefaultLogger } from "../logger.js";
-import { noopSDKResult } from "../noop.js";
-import { buildResource } from "../resource.js";
-import type { RuntimeAdapter, SDKConfig, SDKResult } from "../types.js";
+import { resolveSignalEndpoint } from "../shared/endpoints.js";
+import { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "../shared/exporters.js";
+import { createLogger, setDefaultLogger } from "../shared/logger.js";
+import { noopSDKResult } from "../shared/noop.js";
+import { buildResource } from "../shared/resource.js";
+import type { RuntimeAdapter, SDKConfig, SDKResult } from "../shared/types.js";
+import { getOriginalFetch, instrumentFetch, isFetchPatched } from "./fetch/patch.js";
 
 export const browserAdapter: RuntimeAdapter = {
 	name: "browser",
-	detect: detectBrowser,
 	setup(config: SDKConfig): SDKResult {
 		try {
 			const { resource, warnings } = buildResource(config, []);

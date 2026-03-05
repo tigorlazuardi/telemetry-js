@@ -8,11 +8,11 @@ import {
 	type TextMapSetter,
 	trace,
 } from "@opentelemetry/api";
-import { instrumentFetch } from "../../instrument-fetch.js";
-import { getLogger } from "../../logger.js";
-import { noopSDKResult } from "../../noop.js";
-import type { LogAttributes, Logger, SDKConfig, SDKResult } from "../../types.js";
-import { cloudflareWorkerAdapter } from "./worker.js";
+import { instrumentFetch } from "../shared/fetch.js";
+import { getLogger } from "../shared/logger.js";
+import { noopSDKResult } from "../shared/noop.js";
+import type { LogAttributes, Logger, SDKConfig, SDKResult } from "../shared/types.js";
+import { cloudflareWorkerAdapter } from "./adapter.js";
 
 // Minimal CF types to avoid @cloudflare/workers-types dependency
 interface ExecutionContext {

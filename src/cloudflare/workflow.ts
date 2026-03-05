@@ -10,7 +10,7 @@ import {
 	type TextMapSetter,
 	trace,
 } from "@opentelemetry/api";
-import type { Carrier, SDKConfig } from "../../types.js";
+import type { Carrier, SDKConfig } from "../shared/types.js";
 import { ensureSDK } from "./instrument.js";
 
 // Minimal CF Workflow types to avoid @cloudflare/workers-types dependency

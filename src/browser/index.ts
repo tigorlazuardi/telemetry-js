@@ -58,9 +58,9 @@
  */
 
 import type { Resource } from "@opentelemetry/resources";
-import { noopSDKResult } from "./noop.js";
-import { browserAdapter } from "./runtimes/browser.js";
-import type { SDKConfig, SDKResult } from "./types.js";
+import { noopSDKResult } from "../shared/noop.js";
+import type { SDKConfig, SDKResult } from "../shared/types.js";
+import { browserAdapter } from "./adapter.js";
 
 /** Module-level reference to the last initialised resource. */
 let _globalResource: Resource | null = null;
@@ -100,14 +100,13 @@ export type {
 } from "@opentelemetry/api";
 export { metrics } from "@opentelemetry/api";
 export type { Resource } from "@opentelemetry/resources";
-export { normalizeEndpoint, resolveSignalEndpoint } from "./endpoints.js";
-export type { FetchExporterConfig } from "./exporters.js";
-export { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "./exporters.js";
-export { instrumentFetch } from "./instrument-fetch-browser.js";
-export { createLogger, getLogger, runWithLogger, setDefaultLogger } from "./logger.js";
-export { noopLogger, noopSDKResult } from "./noop.js";
-export type { TracedCallContext, TracedInput } from "./traced.js";
-export { traced } from "./traced.js";
+export { normalizeEndpoint, resolveSignalEndpoint } from "../shared/endpoints.js";
+export type { FetchExporterConfig } from "../shared/exporters.js";
+export { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "../shared/exporters.js";
+export { createLogger, getLogger, runWithLogger, setDefaultLogger } from "../shared/logger.js";
+export { noopLogger, noopSDKResult } from "../shared/noop.js";
+export type { TracedCallContext, TracedInput } from "../shared/traced.js";
+export { traced } from "../shared/traced.js";
 export type {
 	Carrier,
 	LogAttributes,
@@ -119,6 +118,7 @@ export type {
 	RuntimeName,
 	SDKConfig,
 	SDKResult,
-} from "./types.js";
-export type { WithTraceOptions } from "./with-trace.js";
-export { withTrace } from "./with-trace.js";
+} from "../shared/types.js";
+export type { WithTraceOptions } from "../shared/with-trace.js";
+export { withTrace } from "../shared/with-trace.js";
+export { instrumentFetch } from "./fetch/patch.js";

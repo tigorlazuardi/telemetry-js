@@ -1,8 +1,8 @@
 import type { ResourceDetector } from "@opentelemetry/resources";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildResource, parseEnvResourceAttributes } from "../src/resource.js";
-import type { SDKConfig } from "../src/types.js";
+import { buildResource, parseEnvResourceAttributes } from "../src/shared/resource.js";
+import type { SDKConfig } from "../src/shared/types.js";
 
 const ATTR_DEPLOYMENT_ENVIRONMENT_NAME = "deployment.environment.name";
 const ATTR_SERVICE_NAMESPACE = "service.namespace";

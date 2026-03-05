@@ -27,8 +27,8 @@ vi.mock("@opentelemetry/api", async () => {
 	};
 });
 
-import type { TracedCallContext } from "../src/traced.js";
-import { traced } from "../src/traced.js";
+import type { TracedCallContext } from "../src/shared/traced.js";
+import { traced } from "../src/shared/traced.js";
 
 describe("traced", () => {
 	beforeEach(() => {

@@ -34,8 +34,8 @@ vi.mock("@opentelemetry/api", async () => {
 	};
 });
 
-import { instrumentFetch } from "../src/instrument-fetch.js";
-import type { Logger } from "../src/types.js";
+import { instrumentFetch } from "../src/shared/fetch.js";
+import type { Logger } from "../src/shared/types.js";
 
 function createMockLogger(): Logger & {
 	info: ReturnType<typeof vi.fn>;

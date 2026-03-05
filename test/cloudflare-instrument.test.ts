@@ -223,7 +223,7 @@ describe("instrument", () => {
 
 		it("does not re-initialize SDK on subsequent calls", async () => {
 			const handler = instrument(
-				{ fetch: vi.fn().mockResolvedValue(new Response("ok")) },
+				{ fetch: vi.fn().mockImplementation(() => new Response("ok")) },
 				{ serviceName: "auto-init-test" },
 			);
 
@@ -523,7 +523,7 @@ describe("traceHandler auto-logging", () => {
 		expect(attrs["http.request.path"]).toBe("/api/test");
 	});
 
-	it("does not log when logger is not provided", async () => {
+	it("does not log when logger is false", async () => {
 		const ctx = createMockCtx();
 
 		await traceHandler({
@@ -532,6 +532,7 @@ describe("traceHandler auto-logging", () => {
 			request: new Request("https://example.com/api/test"),
 			serviceName: "test",
 			handler: () => new Response("ok"),
+			logger: false,
 		});
 
 		// No crash, no logger called

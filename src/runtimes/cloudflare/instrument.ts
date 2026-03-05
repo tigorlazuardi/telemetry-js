@@ -199,9 +199,9 @@ export interface TraceHandlerOptions<T = Response> extends InstrumentOptions {
 	onFlush?: () => void | Promise<void>;
 	/**
 	 * Logger for automatic request/response logging.
-	 * When `true`, uses `getLogger()`. When a `Logger` instance, uses that.
-	 * When `false` or omitted, no automatic logging is performed.
-	 * @default false
+	 * When `true` or omitted, uses `getLogger()`. When a `Logger` instance, uses that.
+	 * When `false`, no automatic logging is performed.
+	 * @default true
 	 */
 	logger?: Logger | boolean;
 	/**
@@ -275,9 +275,13 @@ export async function traceHandler<T = Response>(opts: TraceHandlerOptions<T>): 
 	const extractedCtx = propagation.extract(context.active(), request.headers, headerGetter);
 	let span: Span | undefined;
 
-	// Resolve logger
+	// Resolve logger (default: true → getLogger())
 	const logger: Logger | undefined =
-		loggerOpt === true ? getLogger() : loggerOpt === false ? undefined : loggerOpt || undefined;
+		loggerOpt === false
+			? undefined
+			: loggerOpt === true || loggerOpt == null
+				? getLogger()
+				: loggerOpt;
 	const sensitiveSet = sensitiveHeaders
 		? new Set(sensitiveHeaders.map((h) => h.toLowerCase()))
 		: DEFAULT_SENSITIVE_HEADERS;

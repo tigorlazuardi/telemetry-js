@@ -6,10 +6,15 @@
  * lighter than the Node.js `@opentelemetry/exporter-*-otlp-http` packages
  * that pull in `http`/`https`/`zlib`.
  *
- * Context propagation uses {@link AsyncLocalStorage}-free span tracking
- * via the OTel `ZoneContextManager` pattern — but since Zone.js is heavy,
- * we use the simpler `StackContextManager` approach (just the global API
- * default) which works for non-concurrent browser code.
+ * Context propagation uses the OTel API's default context manager (no
+ * Zone.js dependency). This works for browser code because the JS main
+ * thread is single-threaded — `tracer.startActiveSpan()` correctly
+ * propagates context through `await` chains as long as there is no
+ * concurrent interleaving of unrelated traces.
+ *
+ * `globalThis.fetch` is automatically monkey-patched via
+ * {@link instrumentFetch} so outgoing fetch calls are traced and W3C
+ * trace context headers (`traceparent`/`tracestate`) are injected.
  */
 
 import { metrics, propagation, type TracerProvider, trace } from "@opentelemetry/api";
@@ -26,6 +31,7 @@ import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { detectBrowser } from "../detect.js";
 import { resolveSignalEndpoint } from "../endpoints.js";
 import { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "../exporters.js";
+import { instrumentFetch } from "../instrument-fetch.js";
 import { createLogger, setDefaultLogger } from "../logger.js";
 import { noopSDKResult } from "../noop.js";
 import { buildResource } from "../resource.js";
@@ -65,6 +71,10 @@ export const browserAdapter: RuntimeAdapter = {
 					propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
 				}),
 			);
+
+			// Monkey-patch globalThis.fetch so outgoing requests are traced
+			// and W3C trace context headers are injected automatically.
+			globalThis.fetch = instrumentFetch(globalThis.fetch);
 
 			// Meter provider
 			let meterProvider: MeterProvider | undefined;

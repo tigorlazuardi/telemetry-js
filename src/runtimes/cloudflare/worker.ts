@@ -46,7 +46,7 @@ import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { detectCloudflareWorker } from "../../detect.js";
 import { resolveSignalEndpoint } from "../../endpoints.js";
 import { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "../../exporters.js";
-import { createLogger, setDefaultLogger } from "../../logger.js";
+import { createLogger, getLogger, setDefaultLogger } from "../../logger.js";
 import { noopSDKResult } from "../../noop.js";
 import { buildResource } from "../../resource.js";
 import type { RuntimeAdapter, SDKConfig, SDKResult } from "../../types.js";
@@ -200,18 +200,43 @@ export const cloudflareWorkerAdapter: RuntimeAdapter = {
 					}
 				},
 				async forceFlush() {
-					try {
-						await provider?.forceFlush();
-						await meterProvider?.forceFlush();
-						await loggerProvider?.forceFlush();
-					} catch (err) {
-						logger.warn("forceFlush failed", {
+					const flushes = [
+						provider?.forceFlush() || Promise.resolve(),
+						meterProvider?.forceFlush() || Promise.resolve(),
+						loggerProvider?.forceFlush() || Promise.resolve(),
+					];
+					const [providerResult, meterResult, loggerResult] = await Promise.allSettled(flushes);
+					if (providerResult.status === "rejected") {
+						const err = providerResult.reason;
+						logger.warn("forceFlush traces failed", {
 							error: err instanceof Error ? err.message : String(err),
+							endpoint: tracesEndpoint,
+						});
+					}
+					if (meterResult.status === "rejected") {
+						const err = meterResult.reason;
+						logger.warn("forceFlush metrics failed", {
+							error: err instanceof Error ? err.message : String(err),
+							endpoint: metricsEndpoint,
+						});
+					}
+					if (loggerResult.status === "rejected") {
+						const err = loggerResult.reason;
+						logger.warn("forceFlush logs failed", {
+							error: err instanceof Error ? err.message : String(err),
+							endpoint: logsEndpoint,
 						});
 					}
 				},
 			};
-		} catch {
+		} catch (err) {
+			const e = err as Error;
+			getLogger().error("failed to initiate OpenTelemetry Cloudflare", {
+				error: e.message,
+				name: e.name,
+				stack: e.stack,
+			});
+
 			return noopSDKResult();
 		}
 	},

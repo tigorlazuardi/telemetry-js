@@ -101,8 +101,8 @@ export function _resetBrowserFetch(): void {
  * instrumentFetch();
  * ```
  */
-export function instrumentFetch(): void {
-	if (_patched) return;
+export function instrumentFetch(): typeof fetch {
+	if (_patched) return globalThis.fetch;
 
 	// Capture the real fetch before we overwrite it
 	_originalFetch = globalThis.fetch;
@@ -110,7 +110,7 @@ export function instrumentFetch(): void {
 
 	const realFetch = _originalFetch;
 
-	globalThis.fetch = async function instrumentedFetch(
+	const instrumentedFetch = async function instrumentedFetch(
 		input: string | URL | Request,
 		init?: RequestInit,
 	): Promise<Response> {
@@ -119,4 +119,7 @@ export function instrumentFetch(): void {
 		}
 		return _otel.tracedFetch(realFetch, input, init);
 	};
+
+	globalThis.fetch = instrumentedFetch;
+	return instrumentedFetch;
 }

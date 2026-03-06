@@ -20,6 +20,13 @@ export interface WithTraceOptions {
 	/** Initial span attributes. */
 	attributes?: Record<string, string>;
 	/**
+	 * Component name that prefixes the span name and is set as `ui.component`.
+	 *
+	 * When provided, the span name becomes `"Component.name"` (or
+	 * `"Component.autoDetectedName"` when `name` is omitted).
+	 */
+	component?: string;
+	/**
 	 * Parent context — either an existing {@link Span} or a W3C `traceparent`
 	 * string (e.g. `"00-<traceId>-<spanId>-01"`).
 	 *
@@ -159,16 +166,20 @@ function resolveParentContext(parent?: Span | string, carrier?: unknown) {
  * ```
  */
 export function withTrace<T>(fn: (span: Span) => T, opts?: WithTraceOptions): T {
-	const spanName = opts?.name ?? deriveSpanName(fn);
+	const baseName = opts?.name ?? deriveSpanName(fn);
+	const spanName = opts?.component ? `${opts.component}.${baseName}` : baseName;
 	const tracerName = deriveTracerName();
 	const tracer = trace.getTracer(tracerName);
 	const parentCtx = resolveParentContext(opts?.parent, opts?.carrier);
+
+	const attributes: Record<string, string> = { ...opts?.attributes };
+	if (opts?.component) attributes["ui.component"] = opts.component;
 
 	return tracer.startActiveSpan(
 		spanName,
 		{
 			kind: opts?.kind ?? SpanKind.INTERNAL,
-			...(opts?.attributes ? { attributes: opts.attributes } : {}),
+			...(Object.keys(attributes).length > 0 ? { attributes } : {}),
 		},
 		parentCtx,
 		(span: Span) => {

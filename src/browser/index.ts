@@ -100,6 +100,8 @@ export type {
 } from "@opentelemetry/api";
 export { metrics } from "@opentelemetry/api";
 export type { Resource } from "@opentelemetry/resources";
+export type { ActionOptions, ActionScope, ScopedAction } from "../shared/action.js";
+export { scopeAction, withAction } from "../shared/action.js";
 export type { InjectContextOptions } from "../shared/context.js";
 export { injectContext } from "../shared/context.js";
 export { normalizeEndpoint, resolveSignalEndpoint } from "../shared/endpoints.js";

@@ -1,5 +1,8 @@
 import {
+	type Counter,
 	context,
+	type Histogram,
+	metrics,
 	propagation,
 	type Span,
 	SpanKind,
@@ -7,6 +10,7 @@ import {
 	type TextMapGetter,
 	type TextMapSetter,
 	trace,
+	type UpDownCounter,
 } from "@opentelemetry/api";
 import { instrumentFetch } from "../shared/fetch.js";
 import { getLogger } from "../shared/logger.js";
@@ -84,6 +88,35 @@ export interface InstrumentOptions extends Omit<SDKConfig, "runtime"> {}
 
 let sdkResult: SDKResult | null = null;
 let fetchPatched = false;
+
+/* ------------------------------------------------------------------ */
+/*  HTTP server metrics (lazy-initialised on first use)               */
+/* ------------------------------------------------------------------ */
+
+let _httpRequestDuration: Histogram | null = null;
+let _httpRequestTotal: Counter | null = null;
+let _httpActiveRequests: UpDownCounter | null = null;
+
+function getHttpMetrics() {
+	if (!_httpRequestDuration) {
+		const meter = metrics.getMeter("http.server");
+		_httpRequestDuration = meter.createHistogram("http.server.request.duration", {
+			description: "Duration of HTTP server requests in milliseconds",
+			unit: "ms",
+		});
+		_httpRequestTotal = meter.createCounter("http.server.request.total", {
+			description: "Total number of HTTP server requests",
+		});
+		_httpActiveRequests = meter.createUpDownCounter("http.server.active_requests", {
+			description: "Number of in-flight HTTP server requests",
+		});
+	}
+	return {
+		duration: _httpRequestDuration,
+		total: _httpRequestTotal!,
+		active: _httpActiveRequests!,
+	};
+}
 
 export function ensureSDK(config: Omit<SDKConfig, "runtime">): SDKResult {
 	if (!sdkResult) {
@@ -297,6 +330,10 @@ export async function traceHandler<T = Response>(opts: TraceHandlerOptions<T>): 
 		requestBodyPromise = readLimitedBody(request.clone(), maxBodyLogSize);
 	}
 	const startTime = Date.now();
+	const httpMetrics = getHttpMetrics();
+	const metricAttrs = { "http.method": request.method, "http.route": url.pathname };
+	httpMetrics.active.add(1, metricAttrs);
+	let statusCode = 0;
 
 	try {
 		const result = await tracer.startActiveSpan(
@@ -316,6 +353,7 @@ export async function traceHandler<T = Response>(opts: TraceHandlerOptions<T>): 
 				try {
 					const res = await handler();
 					if (res instanceof Response) {
+						statusCode = res.status;
 						span.setAttribute("http.status_code", res.status);
 						if (res.status >= 500) {
 							span.setStatus({ code: SpanStatusCode.ERROR });
@@ -413,6 +451,12 @@ export async function traceHandler<T = Response>(opts: TraceHandlerOptions<T>): 
 
 		return result;
 	} finally {
+		const duration = Date.now() - startTime;
+		const finalAttrs = { ...metricAttrs, "http.status_code": String(statusCode) };
+		httpMetrics.active.add(-1, metricAttrs);
+		httpMetrics.duration.record(duration, finalAttrs);
+		httpMetrics.total.add(1, finalAttrs);
+
 		ctx?.waitUntil(
 			(async () => {
 				await sdkResult?.forceFlush();
@@ -559,4 +603,7 @@ export function instrument<Env = unknown>(
 export function _resetInstrumentState(): void {
 	sdkResult = null;
 	fetchPatched = false;
+	_httpRequestDuration = null;
+	_httpRequestTotal = null;
+	_httpActiveRequests = null;
 }

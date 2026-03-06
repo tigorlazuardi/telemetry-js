@@ -1,6 +1,6 @@
 {
 	"name": "@tigorhutasuhut/telemetry-js",
-	"version": "1.1.4",
+	"version": "1.1.5",
 	"description": "OpenTelemetry SDK setup abstraction for multiple runtimes",
 	"license": "Apache-2.0",
 	"type": "module",

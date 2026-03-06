@@ -17,9 +17,9 @@ import {
 	trace,
 } from "@opentelemetry/api";
 
-const headerSetter: TextMapSetter<Record<string, string>> = {
+const headerSetter: TextMapSetter<Headers> = {
 	set(carrier, key, value) {
-		carrier[key] = value;
+		carrier.set(key, value);
 	},
 };
 
@@ -51,21 +51,11 @@ export function tracedFetch(
 
 	return tracer.startActiveSpan(`${method} ${url}`, { kind: SpanKind.CLIENT }, async (span) => {
 		try {
-			// Inject trace context into a plain object, then merge with
-			// any existing headers the caller provided.  This avoids the
-			// Request header-guard issue where .set() silently drops
-			// non-simple headers in no-cors mode.
-			const propagationHeaders: Record<string, string> = {};
-			propagation.inject(context.active(), propagationHeaders, headerSetter);
+			const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : {}));
+			const ctx = trace.setSpan(context.active(), span);
+			propagation.inject(ctx, headers, headerSetter);
 
-			const mergedInit: RequestInit = {
-				...init,
-				headers: {
-					...Object.fromEntries(new Headers(init?.headers).entries()),
-					...(input instanceof Request ? Object.fromEntries(input.headers.entries()) : {}),
-					...propagationHeaders,
-				},
-			};
+			const mergedInit: RequestInit = { ...init, headers };
 
 			const response = await realFetch(input instanceof Request ? input.url : input, mergedInit);
 

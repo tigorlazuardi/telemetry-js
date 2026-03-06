@@ -1,4 +1,9 @@
-import type { MeterProvider, SpanContext, TracerProvider } from "@opentelemetry/api";
+import type {
+	ContextManager,
+	MeterProvider,
+	SpanContext,
+	TracerProvider,
+} from "@opentelemetry/api";
 import type { LoggerProvider } from "@opentelemetry/api-logs";
 import type { Resource } from "@opentelemetry/resources";
 
@@ -51,6 +56,16 @@ export interface SDKConfig {
 
 	/** OpenTelemetry instrumentations to register (Node only). */
 	instrumentations?: unknown[];
+
+	/**
+	 * Custom {@link ContextManager} to use for context propagation.
+	 *
+	 * When omitted, a runtime-appropriate default is used:
+	 * - **Browser**: {@link StackContextManager} (simple variable swap, safe for single-threaded JS)
+	 * - **Cloudflare**: `AsyncLocalStorage`-backed context manager
+	 * - **Node**: managed by `@opentelemetry/sdk-node`
+	 */
+	contextManager?: ContextManager;
 
 	/**
 	 * Environment variable map. Used in runtimes where `process.env` is unavailable

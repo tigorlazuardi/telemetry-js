@@ -17,7 +17,7 @@
  * trace context headers (`traceparent`/`tracestate`) are injected.
  */
 
-import { metrics, propagation, type TracerProvider, trace } from "@opentelemetry/api";
+import { context, metrics, propagation, type TracerProvider, trace } from "@opentelemetry/api";
 import { logs } from "@opentelemetry/api-logs";
 import {
 	CompositePropagator,
@@ -34,6 +34,7 @@ import { createLogger, setDefaultLogger } from "../shared/logger.js";
 import { noopSDKResult } from "../shared/noop.js";
 import { buildResource } from "../shared/resource.js";
 import type { RuntimeAdapter, SDKConfig, SDKResult } from "../shared/types.js";
+import { StackContextManager } from "./context-manager.js";
 import { getOriginalFetch, instrumentFetch, isFetchPatched } from "./fetch/patch.js";
 
 export const browserAdapter: RuntimeAdapter = {
@@ -63,6 +64,9 @@ export const browserAdapter: RuntimeAdapter = {
 
 				trace.setGlobalTracerProvider(provider as unknown as TracerProvider);
 			}
+
+			// Context manager
+			context.setGlobalContextManager(config.contextManager ?? new StackContextManager());
 
 			// Propagators
 			propagation.setGlobalPropagator(
@@ -132,6 +136,7 @@ export const browserAdapter: RuntimeAdapter = {
 						await provider?.shutdown();
 						await meterProvider?.shutdown();
 						await loggerProvider?.shutdown();
+						context.disable();
 					} catch {
 						// Never throw
 					}

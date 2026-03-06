@@ -52,6 +52,8 @@ export type {
 } from "@opentelemetry/api";
 export { metrics } from "@opentelemetry/api";
 export type { Resource } from "@opentelemetry/resources";
+export type { InjectContextOptions } from "../shared/context.js";
+export { injectContext } from "../shared/context.js";
 export { normalizeEndpoint, resolveSignalEndpoint } from "../shared/endpoints.js";
 export { createLogger, getLogger, runWithLogger, setDefaultLogger } from "../shared/logger.js";
 export { noopLogger, noopSDKResult } from "../shared/noop.js";

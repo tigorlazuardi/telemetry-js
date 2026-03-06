@@ -100,6 +100,8 @@ export type {
 } from "@opentelemetry/api";
 export { metrics } from "@opentelemetry/api";
 export type { Resource } from "@opentelemetry/resources";
+export type { InjectContextOptions } from "../shared/context.js";
+export { injectContext } from "../shared/context.js";
 export { normalizeEndpoint, resolveSignalEndpoint } from "../shared/endpoints.js";
 export type { FetchExporterConfig } from "../shared/exporters.js";
 export { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "../shared/exporters.js";

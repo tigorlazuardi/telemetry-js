@@ -29,9 +29,7 @@
  * avoid the infinite loop: export → instrumented fetch → new span → export …
  */
 
-/* ------------------------------------------------------------------ */
-/*  NO top-level @opentelemetry imports — keep this module lightweight */
-/* ------------------------------------------------------------------ */
+import { context } from "@opentelemetry/api";
 
 // Lazily loaded OTel modules (populated on first fetch call)
 let _otel: typeof import("./otel.js") | null = null;
@@ -114,10 +112,14 @@ export function instrumentFetch(): typeof fetch {
 		input: string | URL | Request,
 		init?: RequestInit,
 	): Promise<Response> {
+		// Capture active context SYNCHRONOUSLY before any await,
+		// so the parent span is preserved even after StackContextManager
+		// restores its _currentContext in the finally block.
+		const parentCtx = context.active();
 		if (!_otel) {
 			_otel = await import("./otel.js");
 		}
-		return _otel.tracedFetch(realFetch, input, init);
+		return _otel.tracedFetch(realFetch, input, init, parentCtx);
 	};
 
 	globalThis.fetch = instrumentedFetch;

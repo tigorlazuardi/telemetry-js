@@ -9,6 +9,7 @@
  */
 
 import {
+	type Context,
 	context,
 	propagation,
 	SpanKind,
@@ -44,36 +45,45 @@ function parseFetchArgs(input: string | URL | Request, init?: RequestInit) {
 export function tracedFetch(
 	realFetch: typeof fetch,
 	input: string | URL | Request,
-	init?: RequestInit,
+	init: RequestInit | undefined,
+	parentCtx?: Context,
 ): Promise<Response> {
 	const { method, url } = parseFetchArgs(input, init);
 	const tracer = trace.getTracer("fetch");
+	const activeCtx = parentCtx ?? context.active();
 
-	return tracer.startActiveSpan(`${method} ${url}`, { kind: SpanKind.CLIENT }, async (span) => {
-		try {
-			const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : {}));
-			const ctx = trace.setSpan(context.active(), span);
-			propagation.inject(ctx, headers, headerSetter);
+	return tracer.startActiveSpan(
+		`${method} ${url}`,
+		{ kind: SpanKind.CLIENT },
+		activeCtx,
+		async (span) => {
+			try {
+				const headers = new Headers(
+					init?.headers || (input instanceof Request ? input.headers : {}),
+				);
+				const ctx = trace.setSpan(context.active(), span);
+				propagation.inject(ctx, headers, headerSetter);
 
-			const mergedInit: RequestInit = { ...init, headers };
+				const mergedInit: RequestInit = { ...init, headers };
 
-			const response = await realFetch(input instanceof Request ? input.url : input, mergedInit);
+				const response = await realFetch(input instanceof Request ? input.url : input, mergedInit);
 
-			span.setAttribute("http.status_code", response.status);
-			if (response.status >= 500) {
-				span.setStatus({ code: SpanStatusCode.ERROR });
+				span.setAttribute("http.status_code", response.status);
+				if (response.status >= 500) {
+					span.setStatus({ code: SpanStatusCode.ERROR });
+				}
+
+				return response;
+			} catch (error) {
+				span.setStatus({
+					code: SpanStatusCode.ERROR,
+					message: error instanceof Error ? error.message : String(error),
+				});
+				span.recordException(error as Error);
+				throw error;
+			} finally {
+				span.end();
 			}
-
-			return response;
-		} catch (error) {
-			span.setStatus({
-				code: SpanStatusCode.ERROR,
-				message: error instanceof Error ? error.message : String(error),
-			});
-			span.recordException(error as Error);
-			throw error;
-		} finally {
-			span.end();
-		}
-	});
+		},
+	);
 }

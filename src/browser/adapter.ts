@@ -26,7 +26,7 @@ import {
 } from "@opentelemetry/core";
 import { LoggerProvider, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
-import { BasicTracerProvider, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { BasicTracerProvider, BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 import { resolveSignalEndpoint } from "../shared/endpoints.js";
 import { FetchLogExporter, FetchMetricExporter, FetchTraceExporter } from "../shared/exporters.js";
@@ -59,7 +59,7 @@ export const browserAdapter: RuntimeAdapter = {
 
 				provider = new BasicTracerProvider({
 					resource,
-					spanProcessors: [new SimpleSpanProcessor(traceExporter)],
+					spanProcessors: [new BatchSpanProcessor(traceExporter)],
 				});
 
 				trace.setGlobalTracerProvider(provider as unknown as TracerProvider);

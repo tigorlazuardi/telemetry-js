@@ -31,9 +31,6 @@
 
 import { context } from "@opentelemetry/api";
 
-// Lazily loaded OTel modules (populated on first fetch call)
-let _otel: typeof import("./otel.js") | null = null;
-
 /* ------------------------------------------------------------------ */
 /*  Original fetch capture                                            */
 /* ------------------------------------------------------------------ */
@@ -69,7 +66,6 @@ export function isFetchPatched(): boolean {
 export function _resetBrowserFetch(): void {
 	_originalFetch = null;
 	_patched = false;
-	_otel = null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -83,8 +79,9 @@ export function _resetBrowserFetch(): void {
  * side-effect — so that every library that later captures `fetch` gets
  * the instrumented version.
  *
- * This function itself does **not** import any `@opentelemetry/*` modules.
- * The OTel tracing code is loaded lazily on the first actual `fetch()`
+ * This function itself does **not** import any `@opentelemetry/*` modules, except
+ * `@opentelemetry/api` which is very light.
+ * The OTel tracing implementation code is loaded lazily on the first actual `fetch()`
  * call via a dynamic `import()`.
  *
  * Safe to call before `initSDK()` — spans only become real once a
@@ -116,10 +113,8 @@ export function instrumentFetch(): typeof fetch {
 		// so the parent span is preserved even after StackContextManager
 		// restores its _currentContext in the finally block.
 		const parentCtx = context.active();
-		if (!_otel) {
-			_otel = await import("./otel.js");
-		}
-		return _otel.tracedFetch(realFetch, input, init, parentCtx);
+		const otel = await import("./otel.js");
+		return otel.tracedFetch(realFetch, input, init, parentCtx);
 	};
 
 	globalThis.fetch = instrumentedFetch;

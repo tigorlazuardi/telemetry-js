@@ -81,6 +81,7 @@ export { withTrace } from "../shared/with-trace.js";
 // ── Cloudflare-specific APIs ────────────────────────────────────────────
 
 export type {
+	ExportedHandler,
 	InstrumentOptions,
 	MinimalExecutionContext,
 	TraceHandlerOptions,

@@ -75,7 +75,7 @@ type QueueHandler<Env = unknown, T = unknown> = (
 	ctx: ExecutionContext,
 ) => void | Promise<void>;
 
-interface ExportedHandler<Env = unknown> {
+export interface ExportedHandler<Env = unknown> {
 	fetch?: FetchHandler<Env>;
 	scheduled?: ScheduledHandler<Env>;
 	queue?: QueueHandler<Env>;

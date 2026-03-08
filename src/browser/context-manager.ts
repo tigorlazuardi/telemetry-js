@@ -32,8 +32,11 @@ export class StackContextManager implements ContextManager {
 		this._currentContext = ctx;
 		try {
 			const result = fn.call(thisArg!, ...args);
-			if (result instanceof Promise) {
-				return result.finally(() => {
+			if (
+				result != null &&
+				typeof (result as unknown as PromiseLike<unknown>).then === "function"
+			) {
+				return (result as unknown as Promise<unknown>).finally(() => {
 					this._currentContext = prev;
 				}) as ReturnType<F>;
 			}

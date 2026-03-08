@@ -196,8 +196,11 @@ export function withTrace<T>(fn: (span: Span) => T, opts?: WithTraceOptions): T 
 				throw error;
 			}
 
-			if (result instanceof Promise) {
-				return result.then(
+			if (
+				result != null &&
+				typeof (result as unknown as PromiseLike<unknown>).then === "function"
+			) {
+				return (result as unknown as PromiseLike<unknown>).then(
 					(value) => {
 						span.end();
 						return value;

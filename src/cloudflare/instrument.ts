@@ -461,7 +461,11 @@ export async function traceHandler<T = Response>(opts: TraceHandlerOptions<T>): 
 			(async () => {
 				await sdkResult?.forceFlush();
 				const result = opts.onFlush?.();
-				if (result instanceof Promise) await result;
+				if (
+					result != null &&
+					typeof (result as unknown as PromiseLike<unknown>).then === "function"
+				)
+					await result;
 			})(),
 		);
 	}

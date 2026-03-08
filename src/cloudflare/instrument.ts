@@ -19,7 +19,7 @@ import type { LogAttributes, Logger, SDKConfig, SDKResult } from "../shared/type
 import { cloudflareWorkerAdapter } from "./adapter.js";
 
 // Minimal CF types to avoid @cloudflare/workers-types dependency
-interface ExecutionContext {
+export interface ExecutionContext {
 	waitUntil(promise: Promise<unknown>): void;
 	passThroughOnException(): void;
 	/** For compatibility with Wrangler 4.x. */
@@ -31,20 +31,20 @@ export interface MinimalExecutionContext {
 	waitUntil(promise: Promise<unknown>): void;
 }
 
-interface ScheduledController {
+export interface ScheduledController {
 	scheduledTime: number;
 	cron: string;
 	noRetry(): void;
 }
 
-interface MessageBatch<T = unknown> {
+export interface MessageBatch<T = unknown> {
 	readonly queue: string;
 	readonly messages: readonly Message<T>[];
 	ackAll(): void;
 	retryAll(options?: MessageRetryOptions): void;
 }
 
-interface Message<T = unknown> {
+export interface Message<T = unknown> {
 	readonly id: string;
 	readonly timestamp: Date;
 	readonly body: T;
@@ -53,23 +53,23 @@ interface Message<T = unknown> {
 	retry(options?: MessageRetryOptions): void;
 }
 
-interface MessageRetryOptions {
+export interface MessageRetryOptions {
 	delaySeconds?: number;
 }
 
-type FetchHandler<Env = unknown> = (
+export type FetchHandler<Env = unknown> = (
 	request: Request,
 	env: Env,
 	ctx: ExecutionContext,
 ) => Response | Promise<Response>;
 
-type ScheduledHandler<Env = unknown> = (
+export type ScheduledHandler<Env = unknown> = (
 	controller: ScheduledController,
 	env: Env,
 	ctx: ExecutionContext,
 ) => void | Promise<void>;
 
-type QueueHandler<Env = unknown, T = unknown> = (
+export type QueueHandler<Env = unknown, T = unknown> = (
 	batch: MessageBatch<T>,
 	env: Env,
 	ctx: ExecutionContext,

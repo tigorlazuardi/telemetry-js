@@ -81,9 +81,17 @@ export { withTrace } from "../shared/with-trace.js";
 // ── Cloudflare-specific APIs ────────────────────────────────────────────
 
 export type {
+	ExecutionContext,
 	ExportedHandler,
+	FetchHandler,
 	InstrumentOptions,
+	Message,
+	MessageBatch,
+	MessageRetryOptions,
 	MinimalExecutionContext,
+	QueueHandler,
+	ScheduledController,
+	ScheduledHandler,
 	TraceHandlerOptions,
 } from "./instrument.js";
 export { instrument, traceHandler } from "./instrument.js";

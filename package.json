@@ -52,18 +52,18 @@
 	"packageManager": "pnpm@10.30.0",
 	"dependencies": {
 		"@opentelemetry/api": "^1.9.0",
-		"@opentelemetry/api-logs": "^0.212.0",
-		"@opentelemetry/core": "^2.5.1",
-		"@opentelemetry/exporter-logs-otlp-http": "^0.212.0",
-		"@opentelemetry/exporter-metrics-otlp-http": "^0.212.0",
-		"@opentelemetry/exporter-trace-otlp-http": "^0.212.0",
-		"@opentelemetry/otlp-transformer": "^0.212.0",
-		"@opentelemetry/resources": "^2.5.1",
-		"@opentelemetry/sdk-logs": "^0.212.0",
-		"@opentelemetry/sdk-metrics": "^2.5.1",
-		"@opentelemetry/sdk-node": "^0.212.0",
-		"@opentelemetry/sdk-trace-base": "^2.5.1",
-		"@opentelemetry/semantic-conventions": "^1.39.0"
+		"@opentelemetry/api-logs": "^0.213.0",
+		"@opentelemetry/core": "^2.6.0",
+		"@opentelemetry/exporter-logs-otlp-http": "^0.213.0",
+		"@opentelemetry/exporter-metrics-otlp-http": "^0.213.0",
+		"@opentelemetry/exporter-trace-otlp-http": "^0.213.0",
+		"@opentelemetry/otlp-transformer": "^0.213.0",
+		"@opentelemetry/resources": "^2.6.0",
+		"@opentelemetry/sdk-logs": "^0.213.0",
+		"@opentelemetry/sdk-metrics": "^2.6.0",
+		"@opentelemetry/sdk-node": "^0.213.0",
+		"@opentelemetry/sdk-trace-base": "^2.6.0",
+		"@opentelemetry/semantic-conventions": "^1.40.0"
 	},
 	"peerDependencies": {
 		"pino": ">=8.0.0"
@@ -74,10 +74,10 @@
 		}
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.4.4",
-		"@types/node": "^25.3.3",
+		"@biomejs/biome": "^2.4.6",
+		"@types/node": "^25.3.5",
 		"husky": "^9.1.7",
-		"lint-staged": "^16.3.0",
+		"lint-staged": "^16.3.2",
 		"typedoc": "^0.28.17",
 		"typescript": "^5.9.3",
 		"vitest": "^4.0.18"

@@ -61,7 +61,7 @@ describe("db", () => {
 			withQueryName("listOrders", () => "ok");
 
 			expect(startActiveSpanSpy).toHaveBeenCalledWith(
-				"listOrders",
+				"db.listOrders",
 				{ kind: SpanKind.CLIENT, attributes: { "db.query.name": "listOrders" } },
 				expect.anything(),
 				expect.any(Function),

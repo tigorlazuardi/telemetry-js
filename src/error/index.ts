@@ -191,13 +191,11 @@ export class AppError extends Error {
 				typeof (result as unknown as PromiseLike<unknown>).then === "function"
 			) {
 				return (result as unknown as PromiseLike<unknown>).then(undefined, (err: unknown) => {
-					if (err instanceof AppError) throw err;
 					throw AppError.wrap(err);
 				}) as T;
 			}
 			return result;
 		} catch (err) {
-			if (err instanceof AppError) throw err;
 			throw AppError.wrap(err);
 		}
 	}

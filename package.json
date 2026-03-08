@@ -24,6 +24,10 @@
 		"./error": {
 			"types": "./dist/error/index.d.ts",
 			"default": "./dist/error/index.js"
+		},
+		"./db": {
+			"types": "./dist/db/index.d.ts",
+			"default": "./dist/db/index.js"
 		}
 	},
 	"files": [

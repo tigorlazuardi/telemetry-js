@@ -20,6 +20,10 @@
 		"./browser/fetch": {
 			"types": "./dist/browser/fetch/index.d.ts",
 			"default": "./dist/browser/fetch/index.js"
+		},
+		"./error": {
+			"types": "./dist/error/index.d.ts",
+			"default": "./dist/error/index.js"
 		}
 	},
 	"files": [

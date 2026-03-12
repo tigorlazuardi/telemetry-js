@@ -8,6 +8,7 @@ import {
 	type TextMapGetter,
 	trace,
 } from "@opentelemetry/api";
+import { SIGNAL_KEY } from "./signal.js";
 
 /**
  * Options for {@link withTrace}.
@@ -46,6 +47,18 @@ export interface WithTraceOptions {
 	 * Non-object values are silently ignored.
 	 */
 	carrier?: unknown;
+	/**
+	 * Optional {@link AbortSignal} to propagate through the OTel context.
+	 *
+	 * If a parent signal already exists in the active context (from an outer
+	 * `withTrace`, `withCancel`, `withTimeout`, or `withDeadline`), the signals
+	 * are merged via `AbortSignal.any()` — the derived signal aborts when
+	 * **either** the parent or this signal aborts.
+	 *
+	 * Downstream code can read the signal via `getSignal()` from
+	 * `@tigorhutasuhut/telemetry-js/context`.
+	 */
+	signal?: AbortSignal;
 }
 
 /**
@@ -170,7 +183,15 @@ export function withTrace<T>(fn: (span: Span) => T, opts?: WithTraceOptions): T 
 	const spanName = opts?.component ? `${opts.component}.${baseName}` : baseName;
 	const tracerName = deriveTracerName();
 	const tracer = trace.getTracer(tracerName);
-	const parentCtx = resolveParentContext(opts?.parent, opts?.carrier);
+	let parentCtx = resolveParentContext(opts?.parent, opts?.carrier);
+
+	// Propagate AbortSignal through the OTel context, deriving from
+	// any existing parent signal so parent cancellation cascades down.
+	if (opts?.signal) {
+		const parentSignal = parentCtx.getValue(SIGNAL_KEY) as AbortSignal | undefined;
+		const derived = parentSignal ? AbortSignal.any([parentSignal, opts.signal]) : opts.signal;
+		parentCtx = parentCtx.setValue(SIGNAL_KEY, derived);
+	}
 
 	const attributes: Record<string, string> = { ...opts?.attributes };
 	if (opts?.component) attributes["ui.component"] = opts.component;

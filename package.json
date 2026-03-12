@@ -28,6 +28,10 @@
 		"./db": {
 			"types": "./dist/db/index.d.ts",
 			"default": "./dist/db/index.js"
+		},
+		"./context": {
+			"types": "./dist/context/index.d.ts",
+			"default": "./dist/context/index.js"
 		}
 	},
 	"files": [

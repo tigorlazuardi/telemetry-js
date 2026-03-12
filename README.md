@@ -141,6 +141,70 @@ VITE_OTEL_SERVICE_NAMESPACE=my-team
 
 Before the `TracerProvider` is registered by `initSDK`, the OTel API returns a noop tracer — `fetch` works normally, just without tracing. Once the provider is up, every subsequent `fetch` call produces real CLIENT spans with W3C `traceparent`/`tracestate` header injection.
 
+## `withTrace` — Manual Span Creation
+
+`withTrace` wraps a function in an OpenTelemetry span. It is re-exported from every runtime subpath (`/cloudflare`, `/node`, `/browser`).
+
+```ts
+import { withTrace } from "@tigorhutasuhut/telemetry-js/node";
+
+const user = await withTrace(async function fetchUser(span) {
+  span.setAttribute("user.id", id);
+  return db.users.find(id);
+});
+```
+
+The span name is auto-detected from the function name (or caller file:line for anonymous functions). Override it with `opts.name`.
+
+### Options
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `name` | `string` | Override auto-detected span name |
+| `kind` | `SpanKind` | Span kind (default: `INTERNAL`) |
+| `attributes` | `Record<string, string>` | Initial span attributes |
+| `component` | `string` | Prefix span name with component (also sets `ui.component`) |
+| `parent` | `Span \| string` | Parent span or W3C `traceparent` string |
+| `carrier` | `unknown` | Opaque carrier for textmap propagation (e.g. incoming headers) |
+| `signal` | `AbortSignal` | AbortSignal to propagate through the OTel context |
+
+### Signal Integration
+
+The `signal` option propagates an `AbortSignal` through the OTel context, making it readable via `getSignal()` from `@tigorhutasuhut/telemetry-js/context`. If a parent signal already exists, they are merged via `AbortSignal.any()`:
+
+```ts
+import { withTrace } from "@tigorhutasuhut/telemetry-js/node";
+import { getSignal } from "@tigorhutasuhut/telemetry-js/context";
+
+const ac = new AbortController();
+
+await withTrace(
+  async (span) => {
+    const signal = getSignal(); // the AbortSignal from opts
+    const res = await fetch("/api/data", { signal });
+    return res.json();
+  },
+  { signal: ac.signal },
+);
+```
+
+This also composes with the context module — a `withTrace` with `signal` nests cleanly inside `withCancel` / `withTimeout` / `withAbortSignal`:
+
+```ts
+import { withTrace } from "@tigorhutasuhut/telemetry-js/cloudflare";
+import { withTimeout, getSignal } from "@tigorhutasuhut/telemetry-js/context";
+
+// Timeout applies to the entire traced operation
+await withTimeout(5000, async () => {
+  await withTrace(async function processOrder(span) {
+    const signal = getSignal(); // derived from withTimeout's signal
+    const order = await createOrder({ signal });
+    span.setAttribute("order.id", order.id);
+    return order;
+  });
+});
+```
+
 ## `traceHandler` — Non-Standard Entrypoints
 
 For frameworks like SvelteKit on Cloudflare that don't use the standard `ExportedHandler` pattern, use `traceHandler` directly. It wraps a single request with a traced span and handles SDK initialization, W3C trace context propagation, automatic HTTP request/response logging, and flushing.
@@ -357,6 +421,42 @@ withCancel((cancel) => {
 
   const signal = getSignal();
   console.log(signal?.reason); // ContextCanceledError
+});
+```
+
+## Database Query Naming
+
+The `/db` subpath provides `withQueryName` / `getQueryName` for naming database queries via the OTel context. `withQueryName` creates a `CLIENT` span and stores the name so your DB driver wrapper can read it.
+
+```ts
+import { withQueryName, getQueryName } from "@tigorhutasuhut/telemetry-js/db";
+
+// Application code — name the query
+const user = await withQueryName("getUser", () =>
+  db.query("SELECT * FROM users WHERE id = $1", [id]),
+);
+```
+
+Inside your DB driver wrapper, read the name:
+
+```ts
+import { getQueryName } from "@tigorhutasuhut/telemetry-js/db";
+
+function query(sql: string, params: unknown[]) {
+  const name = getQueryName(); // "getUser" (or undefined if not set)
+  // Use name for logging, pg prepared statements, etc.
+  return pool.query({ text: sql, values: params, name });
+}
+```
+
+`withQueryName` creates a span named `db.{name}` with `db.query.name` attribute. It composes with `withTrace` and the context module — the query name propagates through nested OTel contexts:
+
+```ts
+await withTrace(async function handleRequest(span) {
+  // Query name is available inside the traced scope
+  const user = await withQueryName("getUser", () => db.findUser(id));
+  const orders = await withQueryName("listOrders", () => db.findOrders(user.id));
+  return { user, orders };
 });
 ```
 

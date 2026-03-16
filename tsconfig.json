@@ -13,7 +13,7 @@
 		"sourceMap": true,
 		"outDir": "dist",
 		"rootDir": "src",
-		"types": ["vitest/globals", "node"]
+		"types": ["vitest/globals", "@types/node"]
 	},
 	"include": ["src"],
 	"exclude": ["node_modules", "dist", "test"]

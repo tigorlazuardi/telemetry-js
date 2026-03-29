@@ -32,6 +32,10 @@
 		"./context": {
 			"types": "./dist/context/index.d.ts",
 			"default": "./dist/context/index.js"
+		},
+		"./vite": {
+			"types": "./dist/vite/index.d.ts",
+			"default": "./dist/vite/index.js"
 		}
 	},
 	"files": [
@@ -84,6 +88,7 @@
 		"lint-staged": "^16.3.2",
 		"typedoc": "^0.28.17",
 		"typescript": "^5.9.3",
+		"vite": "^8.0.3",
 		"vitest": "^4.0.18"
 	},
 	"lint-staged": {

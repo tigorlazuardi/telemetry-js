@@ -37,6 +37,14 @@ import {
 } from "../src/shared/logger.js";
 import { noopLogger } from "../src/shared/noop.js";
 
+const ANSI = {
+	reset: "\u001B[0m",
+	dim: "\u001B[2m",
+	gray: "\u001B[90m",
+	cyan: "\u001B[36m",
+	green: "\u001B[32m",
+} as const;
+
 // Register AsyncLocalStorage for tests (simulates what runtime adapters do)
 setLoggerStorage(new AsyncLocalStorage());
 
@@ -186,7 +194,7 @@ describe("createLogger", () => {
 
 			const output = stderrSpy.mock.calls[0][0] as string;
 			expect(output).toBe(
-				`[ERROR] [2026-04-21T05:37:36.905Z] [test-service] [request failed]\n${JSON.stringify({ details: { code: 502, retryable: false }, "http.error": { reason: "upstream" } }, null, 2)}\n\n`,
+				`\u001B[31m[ERROR]${ANSI.reset} ${ANSI.dim}[2026-04-21T05:37:36.905Z]${ANSI.reset} ${ANSI.cyan}[test-service]${ANSI.reset} request failed\n${JSON.stringify({ details: { code: 502, retryable: false }, "http.error": { reason: "upstream" } }, null, 2)}\n\n`,
 			);
 		});
 
@@ -204,7 +212,7 @@ describe("createLogger", () => {
 			});
 
 			expect(stderrSpy.mock.calls.at(-1)?.[0]).toBe(
-				`[INFO] [1970-01-01T00:00:00.000Z] [test-service] [first log]\n${JSON.stringify({ details: { ok: true } }, null, 2)}\n\n`,
+				`${ANSI.green}[INFO]${ANSI.reset} ${ANSI.dim}[1970-01-01T00:00:00.000Z]${ANSI.reset} ${ANSI.cyan}[test-service]${ANSI.reset} first log\n${JSON.stringify({ details: { ok: true } }, null, 2)}\n\n`,
 			);
 
 			await new Promise((resolve) => setTimeout(resolve, 0));
@@ -215,7 +223,7 @@ describe("createLogger", () => {
 			});
 
 			expect(stderrSpy.mock.calls.at(-1)?.[0]).toBe(
-				`[INFO] [1970-01-01T00:00:00.001Z] [test-service] [second log]\n<<colored>>\n${JSON.stringify({ details: { ok: true } }, null, 2)}\n<</colored>>\n\n`,
+				`${ANSI.green}[INFO]${ANSI.reset} ${ANSI.dim}[1970-01-01T00:00:00.001Z]${ANSI.reset} ${ANSI.cyan}[test-service]${ANSI.reset} second log\n<<colored>>\n${JSON.stringify({ details: { ok: true } }, null, 2)}\n<</colored>>\n\n`,
 			);
 		});
 
@@ -234,7 +242,7 @@ describe("createLogger", () => {
 
 			const output = stderrSpy.mock.calls.at(-1)?.[0] as string;
 			expect(output).toBe(
-				`[INFO] [1970-01-01T00:00:00.000Z] [test-service] [colored maybe]\n${JSON.stringify({ details: { ok: true } }, null, 2)}\n\n`,
+				`${ANSI.green}[INFO]${ANSI.reset} ${ANSI.dim}[1970-01-01T00:00:00.000Z]${ANSI.reset} ${ANSI.cyan}[test-service]${ANSI.reset} colored maybe\n${JSON.stringify({ details: { ok: true } }, null, 2)}\n\n`,
 			);
 		});
 
@@ -245,7 +253,9 @@ describe("createLogger", () => {
 			});
 
 			const output = stderrSpy.mock.calls[0][0] as string;
-			expect(output).toBe("[INFO] [2026-04-21T05:37:36.905Z] [test-service] [hello tty]\n\n");
+			expect(output).toBe(
+				`${ANSI.green}[INFO]${ANSI.reset} ${ANSI.dim}[2026-04-21T05:37:36.905Z]${ANSI.reset} ${ANSI.cyan}[test-service]${ANSI.reset} hello tty\n\n`,
+			);
 		});
 
 		it("does not attempt colorizer loading outside Node runtimes", async () => {

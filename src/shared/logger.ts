@@ -5,6 +5,16 @@ import type { LogAttributes, Logger, LogLevel, LogOptions } from "./types.js";
 type JsonObject = Record<string, unknown>;
 type JsonHighlighter = (json: string) => string;
 
+const ANSI = {
+	reset: "\u001B[0m",
+	dim: "\u001B[2m",
+	gray: "\u001B[90m",
+	cyan: "\u001B[36m",
+	green: "\u001B[32m",
+	yellow: "\u001B[33m",
+	red: "\u001B[31m",
+} as const;
+
 let _jsonHighlighter: JsonHighlighter | null | undefined;
 let _jsonHighlighterPromise: Promise<JsonHighlighter | null> | undefined;
 
@@ -303,11 +313,21 @@ function formatPretty(
 ): string {
 	const spanCtx = resolveSpanContext(opts);
 	const ts = new Date(opts?.timestamp ?? Date.now()).toISOString();
+	const colorize = (color: string, text: string) => `${color}${text}${ANSI.reset}`;
+	const levelLabel = `[${level.toUpperCase()}]`;
+	const coloredLevel =
+		level === "error"
+			? colorize(ANSI.red, levelLabel)
+			: level === "warn"
+				? colorize(ANSI.yellow, levelLabel)
+				: level === "info"
+					? colorize(ANSI.green, levelLabel)
+					: colorize(ANSI.gray, levelLabel);
 	const header = [
-		`[${level.toUpperCase()}]`,
-		`[${ts}]`,
-		...(serviceName ? [`[${serviceName}]`] : []),
-		`[${message}]`,
+		coloredLevel,
+		colorize(ANSI.dim, `[${ts}]`),
+		...(serviceName ? [colorize(ANSI.cyan, `[${serviceName}]`)] : []),
+		message,
 	].join(" ");
 	const fields = collectLogFields(spanCtx, attrs);
 	const details = formatPrettyDetails(fields);

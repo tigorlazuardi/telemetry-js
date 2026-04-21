@@ -74,9 +74,13 @@
 		"@opentelemetry/semantic-conventions": "^1.40.0"
 	},
 	"peerDependencies": {
+		"cli-highlight": ">=2.1.11",
 		"pino": ">=8.0.0"
 	},
 	"peerDependenciesMeta": {
+		"cli-highlight": {
+			"optional": true
+		},
 		"pino": {
 			"optional": true
 		}

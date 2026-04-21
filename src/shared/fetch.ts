@@ -241,7 +241,7 @@ export function instrumentFetch(
 						"http.method": method,
 						"http.url": url,
 						"http.duration_ms": duration,
-						"http.error": error instanceof Error ? error.message : String(error),
+						"http.error": error instanceof Error ? error.message : error,
 					};
 					logger.error(`${method} ${url} FAILED ${duration}ms`, attrs);
 				}

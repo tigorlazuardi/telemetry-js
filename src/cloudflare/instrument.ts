@@ -436,7 +436,7 @@ export async function traceHandler<T = Response>(opts: TraceHandlerOptions<T>): 
 							"http.request.method": request.method,
 							"http.request.path": url.pathname,
 							"http.duration_ms": duration,
-							"http.error": error instanceof Error ? error.message : String(error),
+							"http.error": error instanceof Error ? error.message : error,
 						};
 						if (url.search) attrs["http.request.query"] = url.search;
 						logger.error(message, attrs);

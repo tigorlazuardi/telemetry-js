@@ -119,7 +119,7 @@ export interface RuntimeAdapter {
 }
 
 /** Key/value pairs attached to log records. */
-export type LogAttributes = Record<string, string | number | boolean | undefined>;
+export type LogAttributes = Record<string, unknown>;
 
 /** Options for individual log calls. */
 export interface LogOptions {

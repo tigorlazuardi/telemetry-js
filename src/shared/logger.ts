@@ -2,6 +2,12 @@ import { context, type SpanContext, trace } from "@opentelemetry/api";
 import { logs, SeverityNumber } from "@opentelemetry/api-logs";
 import type { LogAttributes, Logger, LogLevel, LogOptions } from "./types.js";
 
+type JsonObject = Record<string, unknown>;
+type JsonHighlighter = (json: string) => string;
+
+let _jsonHighlighter: JsonHighlighter | null | undefined;
+let _jsonHighlighterPromise: Promise<JsonHighlighter | null> | undefined;
+
 const SEVERITY: Record<LogLevel, SeverityNumber> = {
 	debug: SeverityNumber.DEBUG,
 	info: SeverityNumber.INFO,
@@ -107,11 +113,18 @@ function emitOtlp(
 	try {
 		const logger = logs.getLogger(serviceName ?? "");
 		const spanCtx = resolveSpanContext(opts);
+		const otlpAttrs: Record<string, string | number | boolean> = {};
+		if (attrs) {
+			for (const [key, value] of Object.entries(attrs)) {
+				const normalized = normalizeOtlpAttributeValue(value);
+				if (normalized !== undefined) otlpAttrs[key] = normalized;
+			}
+		}
 		logger.emit({
 			severityNumber: SEVERITY[level],
 			severityText: level.toUpperCase(),
 			body: message,
-			attributes: attrs as Record<string, string | number | boolean>,
+			attributes: otlpAttrs,
 			timestamp: opts?.timestamp
 				? [Math.floor(opts.timestamp / 1000), (opts.timestamp % 1000) * 1_000_000]
 				: undefined,
@@ -119,6 +132,122 @@ function emitOtlp(
 		});
 	} catch {
 		// Never throw from logger
+	}
+}
+
+function safeJsonStringify(value: unknown, space?: number): string {
+	const seen = new WeakSet<object>();
+	return JSON.stringify(
+		value,
+		(_key, currentValue) => {
+			if (currentValue instanceof Error) {
+				const maybeJson = currentValue as Error & { toJSON?: () => unknown };
+				const json = typeof maybeJson.toJSON === "function" ? maybeJson.toJSON() : undefined;
+				if (json !== undefined) return json;
+				return {
+					...currentValue,
+					name: currentValue.name,
+					message: currentValue.message,
+					stack: currentValue.stack,
+				};
+			}
+
+			if (typeof currentValue === "bigint") return currentValue.toString();
+
+			if (currentValue && typeof currentValue === "object") {
+				if (seen.has(currentValue)) return "[Circular]";
+				seen.add(currentValue);
+			}
+
+			return currentValue;
+		},
+		space,
+	);
+}
+
+function normalizeOtlpAttributeValue(value: unknown): string | number | boolean | undefined {
+	if (value === undefined) return undefined;
+	if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+		return value;
+	}
+	if (value === null) return "null";
+	return safeJsonStringify(value);
+}
+
+function loadJsonHighlighter(): Promise<JsonHighlighter | null> {
+	if (_jsonHighlighterPromise) return _jsonHighlighterPromise;
+
+	const specifier = "cli-highlight";
+	_jsonHighlighterPromise = import(/* @vite-ignore */ specifier)
+		.then((mod) => {
+			const highlight = (mod as { highlight?: unknown }).highlight;
+			if (typeof highlight === "function") {
+				_jsonHighlighter = (json) =>
+					(highlight as (code: string, options?: Record<string, unknown>) => string)(json, {
+						language: "json",
+						ignoreIllegals: true,
+					});
+				return _jsonHighlighter;
+			}
+
+			_jsonHighlighter = null;
+			return _jsonHighlighter;
+		})
+		.catch(() => {
+			// Optional dependency absent or unavailable in current runtime.
+			_jsonHighlighter = null;
+			return _jsonHighlighter;
+		})
+		.finally(() => {
+			_jsonHighlighterPromise = undefined;
+		});
+
+	return _jsonHighlighterPromise;
+}
+
+/**
+ * Lazily load optional JSON syntax highlighting for TTY pretty output.
+ *
+ * This is intentionally Node-only and best-effort so Cloudflare/Wrangler
+ * runtimes never depend on Node-specific or optional colorizing packages.
+ * The first TTY log may render without colors while the highlighter loads.
+ */
+function tryLoadJsonHighlighter(): JsonHighlighter | null {
+	if (_jsonHighlighter !== undefined) return _jsonHighlighter;
+	if (!isNode() || !isTTY()) {
+		_jsonHighlighter = null;
+		return _jsonHighlighter;
+	}
+
+	void loadJsonHighlighter();
+	return null;
+}
+
+function collectLogFields(spanCtx: SpanContext | undefined, attrs?: LogAttributes): JsonObject {
+	const fields: JsonObject = {};
+	if (spanCtx) {
+		fields.traceId = spanCtx.traceId;
+		fields.spanId = spanCtx.spanId;
+	}
+	if (attrs) {
+		for (const [key, value] of Object.entries(attrs)) {
+			if (value !== undefined) fields[key] = value;
+		}
+	}
+	return fields;
+}
+
+function formatPrettyDetails(fields: JsonObject): string | undefined {
+	const details = safeJsonStringify(fields, 2);
+	if (details === "{}") return undefined;
+
+	const highlightJson = tryLoadJsonHighlighter();
+	if (!highlightJson) return details;
+
+	try {
+		return highlightJson(details);
+	} catch {
+		return details;
 	}
 }
 
@@ -137,16 +266,8 @@ function formatJson(
 		msg: message,
 		...(serviceName ? { service: serviceName } : {}),
 	};
-	if (spanCtx) {
-		record.traceId = spanCtx.traceId;
-		record.spanId = spanCtx.spanId;
-	}
-	if (attrs) {
-		for (const [k, v] of Object.entries(attrs)) {
-			if (v !== undefined) record[k] = v;
-		}
-	}
-	return JSON.stringify(record);
+	Object.assign(record, collectLogFields(spanCtx, attrs));
+	return safeJsonStringify(record);
 }
 
 /** Try to load pino. Returns the pino factory or undefined. */
@@ -172,15 +293,6 @@ function isTTY(): boolean {
 	}
 }
 
-// ANSI color codes for TTY pretty-printing
-const COLORS: Record<LogLevel, string> = {
-	debug: "\x1b[36m", // cyan
-	info: "\x1b[32m", // green
-	warn: "\x1b[33m", // yellow
-	error: "\x1b[31m", // red
-};
-const RESET = "\x1b[0m";
-
 /** Pretty-print a log line for TTY stderr output (Node without pino). */
 function formatPretty(
 	level: LogLevel,
@@ -191,20 +303,15 @@ function formatPretty(
 ): string {
 	const spanCtx = resolveSpanContext(opts);
 	const ts = new Date(opts?.timestamp ?? Date.now()).toISOString();
-	const color = COLORS[level];
-	const svcTag = serviceName ? ` [${serviceName}]` : "";
-	let line = `${color}${level.toUpperCase().padEnd(5)}${RESET} ${ts}${svcTag} ${message}`;
-	if (spanCtx) {
-		line += ` traceId=${spanCtx.traceId} spanId=${spanCtx.spanId}`;
-	}
-	if (attrs) {
-		const pairs = Object.entries(attrs)
-			.filter(([, v]) => v !== undefined)
-			.map(([k, v]) => `${k}=${v}`)
-			.join(" ");
-		if (pairs) line += ` ${pairs}`;
-	}
-	return line;
+	const header = [
+		`[${level.toUpperCase()}]`,
+		`[${ts}]`,
+		...(serviceName ? [`[${serviceName}]`] : []),
+		`[${message}]`,
+	].join(" ");
+	const fields = collectLogFields(spanCtx, attrs);
+	const details = formatPrettyDetails(fields);
+	return details ? `${header}\n${details}` : header;
 }
 
 type StderrWriter = (
@@ -265,7 +372,7 @@ function createBuiltinNodeWriter(serviceName: string | undefined): StderrWriter 
 			const line = isTTY()
 				? formatPretty(level, message, serviceName, attrs, opts)
 				: formatJson(level, message, serviceName, attrs, opts);
-			process.stderr.write(`${line}\n`);
+			process.stderr.write(isTTY() ? `${line}\n\n` : `${line}\n`);
 		} catch {
 			// Never throw
 		}
@@ -293,8 +400,8 @@ function createConsoleWriter(serviceName: string | undefined): StderrWriter {
  *   so that the service name is configured in a single place.
  *
  * Dual output:
- * 1. **Stderr** — pino (Node + pino installed), built-in formatter (Node without pino),
- *    or `console[level]` (Cloudflare Workers).
+ * 1. **Stderr** — built-in pretty formatter on TTY, pino for non-TTY Node.js when installed,
+ *    otherwise the built-in JSON formatter, or `console[level]` (Cloudflare Workers).
  * 2. **OTLP** — emits via the global `LoggerProvider` if one is registered.
  *
  * Every method is wrapped in try-catch — **never throws**.
@@ -304,7 +411,7 @@ export function createLogger(serviceName?: string): Logger {
 
 	if (isNode()) {
 		const pino = tryLoadPino();
-		if (typeof pino === "function") {
+		if (!isTTY() && typeof pino === "function") {
 			stderrWriter = createPinoWriter(pino as (...args: unknown[]) => unknown, serviceName);
 		} else {
 			stderrWriter = createBuiltinNodeWriter(serviceName);

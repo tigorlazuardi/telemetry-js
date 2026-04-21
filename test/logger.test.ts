@@ -40,6 +40,24 @@ import { noopLogger } from "../src/shared/noop.js";
 // Register AsyncLocalStorage for tests (simulates what runtime adapters do)
 setLoggerStorage(new AsyncLocalStorage());
 
+function withTTY(value: boolean | undefined, fn: () => void) {
+	const desc = Object.getOwnPropertyDescriptor(process.stderr, "isTTY");
+	Object.defineProperty(process.stderr, "isTTY", {
+		value,
+		writable: true,
+		configurable: true,
+	});
+	try {
+		fn();
+	} finally {
+		if (desc) {
+			Object.defineProperty(process.stderr, "isTTY", desc);
+		} else {
+			delete (process.stderr as Record<string, unknown>).isTTY;
+		}
+	}
+}
+
 describe("createLogger", () => {
 	let stderrSpy: ReturnType<typeof vi.spyOn>;
 
@@ -145,6 +163,131 @@ describe("createLogger", () => {
 			expect(parsed.count).toBe(42);
 			expect(parsed.active).toBe(true);
 		});
+
+		it("serializes object attributes in JSON output", () => {
+			const logger = createLogger("test-service");
+			logger.info("with object attrs", { details: { code: 502, retryable: false } });
+			const output = stderrSpy.mock.calls[0][0] as string;
+			const parsed = JSON.parse(output.trim());
+			expect(parsed.details).toEqual({ code: 502, retryable: false });
+		});
+	});
+
+	describe("TTY pretty output", () => {
+		it("formats logs with a multiline JSON details block", () => {
+			withTTY(true, () => {
+				const logger = createLogger("test-service");
+				logger.error(
+					"request failed",
+					{ details: { code: 502, retryable: false }, "http.error": { reason: "upstream" } },
+					{ timestamp: Date.parse("2026-04-21T05:37:36.905Z") },
+				);
+			});
+
+			const output = stderrSpy.mock.calls[0][0] as string;
+			expect(output).toBe(
+				`[ERROR] [2026-04-21T05:37:36.905Z] [test-service] [request failed]\n${JSON.stringify({ details: { code: 502, retryable: false }, "http.error": { reason: "upstream" } }, null, 2)}\n\n`,
+			);
+		});
+
+		it("colors later TTY logs after async highlighter loads", async () => {
+			await vi.resetModules();
+			vi.doMock("cli-highlight", () => ({
+				highlight: (json: string) => `<<colored>>\n${json}\n<</colored>>`,
+			}));
+
+			const { createLogger: createReloadedLogger } = await import("../src/shared/logger.js");
+
+			withTTY(true, () => {
+				const logger = createReloadedLogger("test-service");
+				logger.info("first log", { details: { ok: true } }, { timestamp: 0 });
+			});
+
+			expect(stderrSpy.mock.calls.at(-1)?.[0]).toBe(
+				`[INFO] [1970-01-01T00:00:00.000Z] [test-service] [first log]\n${JSON.stringify({ details: { ok: true } }, null, 2)}\n\n`,
+			);
+
+			await new Promise((resolve) => setTimeout(resolve, 0));
+
+			withTTY(true, () => {
+				const logger = createReloadedLogger("test-service");
+				logger.info("second log", { details: { ok: true } }, { timestamp: 1 });
+			});
+
+			expect(stderrSpy.mock.calls.at(-1)?.[0]).toBe(
+				`[INFO] [1970-01-01T00:00:00.001Z] [test-service] [second log]\n<<colored>>\n${JSON.stringify({ details: { ok: true } }, null, 2)}\n<</colored>>\n\n`,
+			);
+		});
+
+		it("falls back cleanly when JSON colorizer is unavailable", async () => {
+			await vi.resetModules();
+			vi.doMock("cli-highlight", () => {
+				throw new Error("module unavailable");
+			});
+
+			const { createLogger: createReloadedLogger } = await import("../src/shared/logger.js");
+
+			withTTY(true, () => {
+				const logger = createReloadedLogger("test-service");
+				logger.info("colored maybe", { details: { ok: true } }, { timestamp: 0 });
+			});
+
+			const output = stderrSpy.mock.calls.at(-1)?.[0] as string;
+			expect(output).toBe(
+				`[INFO] [1970-01-01T00:00:00.000Z] [test-service] [colored maybe]\n${JSON.stringify({ details: { ok: true } }, null, 2)}\n\n`,
+			);
+		});
+
+		it("omits JSON block when there are no extra fields", () => {
+			withTTY(true, () => {
+				const logger = createLogger("test-service");
+				logger.info("hello tty", undefined, { timestamp: Date.parse("2026-04-21T05:37:36.905Z") });
+			});
+
+			const output = stderrSpy.mock.calls[0][0] as string;
+			expect(output).toBe("[INFO] [2026-04-21T05:37:36.905Z] [test-service] [hello tty]\n\n");
+		});
+
+		it("does not attempt colorizer loading outside Node runtimes", async () => {
+			await vi.resetModules();
+			const nodeDesc = Object.getOwnPropertyDescriptor(process.versions, "node");
+			Object.defineProperty(process.versions, "node", {
+				value: undefined,
+				configurable: true,
+			});
+
+			const cliHighlightFactory = vi.fn(() => ({
+				highlight: vi.fn((json: string) => json),
+			}));
+			vi.doMock("cli-highlight", cliHighlightFactory);
+
+			try {
+				const { createLogger: createReloadedLogger } = await import("../src/shared/logger.js");
+				const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
+				createReloadedLogger("cf-service").info(
+					"cloudflare-safe",
+					{ details: { ok: true } },
+					{ timestamp: 0 },
+				);
+
+				expect(consoleInfo).toHaveBeenCalledWith(
+					JSON.stringify({
+						level: "info",
+						time: 0,
+						msg: "cloudflare-safe",
+						service: "cf-service",
+						details: { ok: true },
+					}),
+				);
+				expect(cliHighlightFactory).not.toHaveBeenCalled();
+				consoleInfo.mockRestore();
+			} finally {
+				if (nodeDesc) {
+					Object.defineProperty(process.versions, "node", nodeDesc);
+				}
+			}
+		});
 	});
 
 	describe("OTLP bridge", () => {
@@ -186,6 +329,17 @@ describe("createLogger", () => {
 				expect.objectContaining({
 					severityText: "WARN",
 					attributes: { key: "value" },
+				}),
+			);
+		});
+
+		it("stringifies object attributes for OTLP emit", () => {
+			const logger = createLogger("test-service");
+			logger.warn("with object attrs", { details: { code: 502 } });
+			expect(mockEmit).toHaveBeenCalledWith(
+				expect.objectContaining({
+					severityText: "WARN",
+					attributes: { details: '{"code":502}' },
 				}),
 			);
 		});

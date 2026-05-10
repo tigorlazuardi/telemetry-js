@@ -363,7 +363,30 @@ export async function traceHandler<T = Response>(opts: TraceHandlerOptions<T>): 
 					// Inject trace context into response headers when the result is a Response
 					if (res instanceof Response) {
 						const newResponse = new Response(res.body, res);
-						propagation.inject(context.active(), newResponse.headers, headerSetter);
+						const activeCtx = context.active();
+						propagation.inject(activeCtx, newResponse.headers, headerSetter);
+
+						// Explicit traceparent + x-trace-id for easy client extraction
+						const currentSpan = trace.getSpan(activeCtx);
+						if (currentSpan) {
+							const sc = currentSpan.spanContext();
+							if (sc.traceId) {
+								const traceFlagsHex = sc.traceFlags.toString(16).padStart(2, "0");
+								newResponse.headers.set(
+									"traceparent",
+									`00-${sc.traceId}-${sc.spanId}-${traceFlagsHex}`,
+								);
+								newResponse.headers.set("x-trace-id", sc.traceId);
+							}
+						}
+
+						// Propagate baggage as span attributes
+						const baggage = propagation.getBaggage(activeCtx);
+						if (baggage) {
+							for (const [key, entry] of baggage.getAllEntries()) {
+								span.setAttribute(`baggage.${key}`, entry.value);
+							}
+						}
 
 						// Auto-log the request/response (inside span context so logs get span_id/trace_id)
 						if (logger) {

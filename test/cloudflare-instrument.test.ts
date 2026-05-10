@@ -35,9 +35,10 @@ const mockSpanFns = {
 	}),
 };
 
-const { mockExtract, mockInject } = vi.hoisted(() => ({
+const { mockExtract, mockInject, mockGetBaggage } = vi.hoisted(() => ({
 	mockExtract: vi.fn((_ctx: unknown, _carrier: unknown, _getter?: unknown) => ({})),
 	mockInject: vi.fn(),
+	mockGetBaggage: vi.fn().mockReturnValue(undefined),
 }));
 
 vi.mock("@opentelemetry/api", async () => {
@@ -51,8 +52,10 @@ vi.mock("@opentelemetry/api", async () => {
 		propagation: {
 			extract: mockExtract,
 			inject: mockInject,
+			getBaggage: mockGetBaggage,
 		},
 		trace: {
+			getSpan: () => mockSpanFns,
 			getTracer: () => ({
 				startActiveSpan: (
 					_name: string,
@@ -418,6 +421,44 @@ describe("traceHandler", () => {
 				set: expect.any(Function),
 			}),
 		);
+	});
+
+	it("sets traceparent and x-trace-id response headers", async () => {
+		const ctx = createMockCtx();
+
+		const response = await traceHandler({
+			context: ctx,
+			env: {},
+			request: new Request("https://example.com/"),
+			serviceName: "test-service",
+			handler: () => new Response("ok"),
+		});
+
+		expect(response.headers.get("traceparent")).toBe(
+			"00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+		);
+		expect(response.headers.get("x-trace-id")).toBe("0af7651916cd43dd8448eb211c80319c");
+	});
+
+	it("propagates baggage as span attributes", async () => {
+		mockGetBaggage.mockReturnValueOnce({
+			getAllEntries: () => [
+				["userId", { value: "123" }],
+				["tenant", { value: "acme" }],
+			],
+		});
+		const ctx = createMockCtx();
+
+		await traceHandler({
+			context: ctx,
+			env: {},
+			request: new Request("https://example.com/"),
+			serviceName: "test-service",
+			handler: () => new Response("ok"),
+		});
+
+		expect(mockSpanFns.setAttribute).toHaveBeenCalledWith("baggage.userId", "123");
+		expect(mockSpanFns.setAttribute).toHaveBeenCalledWith("baggage.tenant", "acme");
 	});
 });
 

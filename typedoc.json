@@ -4,6 +4,7 @@
 	"entryPoints": [
 		"./src/cloudflare/index.ts",
 		"./src/node/index.ts",
+		"./src/bun/index.ts",
 		"./src/browser/index.ts",
 		"./src/browser/fetch/index.ts",
 		"./src/error/index.ts",

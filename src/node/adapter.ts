@@ -17,7 +17,45 @@ setLoggerStorage(new AsyncLocalStorage());
 
 import { noopSDKResult } from "../shared/noop.js";
 import { buildResource } from "../shared/resource.js";
-import type { RuntimeAdapter, SDKConfig, SDKResult } from "../shared/types.js";
+import type { Logger, RuntimeAdapter, SDKConfig, SDKResult } from "../shared/types.js";
+
+let _exitHooksRegistered = false;
+
+/**
+ * Register one-shot process-exit hooks (`beforeExit`, `SIGTERM`, `SIGINT`)
+ * that flush and shut down the SDK before the process terminates.
+ *
+ * Idempotent across multiple `nodeAdapter.setup()` calls — only the first
+ * registration takes effect. Each hook is `process.once`, so user-supplied
+ * signal handlers are not blocked.
+ */
+function registerExitHooks(shutdown: () => Promise<void>, logger: Logger): void {
+	if (_exitHooksRegistered) return;
+	_exitHooksRegistered = true;
+
+	let shuttingDown = false;
+	const runShutdown = async () => {
+		if (shuttingDown) return;
+		shuttingDown = true;
+		try {
+			await shutdown();
+		} catch (err) {
+			logger.warn("SDK shutdown on exit failed", {
+				error: err instanceof Error ? err.message : String(err),
+			});
+		}
+	};
+
+	process.once("beforeExit", () => {
+		void runShutdown();
+	});
+	process.once("SIGTERM", () => {
+		void runShutdown().finally(() => process.exit(0));
+	});
+	process.once("SIGINT", () => {
+		void runShutdown().finally(() => process.exit(0));
+	});
+}
 
 export const nodeAdapter: RuntimeAdapter = {
 	name: "node",
@@ -77,19 +115,26 @@ export const nodeAdapter: RuntimeAdapter = {
 			setDefaultLogger(logger);
 			for (const w of warnings) logger.warn(w);
 
+			let manualShutdownDone = false;
+			const shutdown = async () => {
+				if (manualShutdownDone) return;
+				manualShutdownDone = true;
+				try {
+					await sdk.shutdown();
+				} catch {
+					// Never throw
+				}
+			};
+
+			registerExitHooks(shutdown, logger);
+
 			return {
 				resource,
 				provider: trace.getTracerProvider(),
 				meterProvider: metricsEndpoint ? metrics.getMeterProvider() : undefined,
 				loggerProvider: logsEndpoint ? logs.getLoggerProvider() : undefined,
 				logger,
-				async shutdown() {
-					try {
-						await sdk.shutdown();
-					} catch {
-						// Never throw
-					}
-				},
+				shutdown,
 				async forceFlush() {
 					try {
 						// NodeSDK doesn't expose forceFlush — flush via global providers

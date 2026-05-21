@@ -13,6 +13,10 @@
 			"types": "./dist/node/index.d.ts",
 			"default": "./dist/node/index.js"
 		},
+		"./bun": {
+			"types": "./dist/bun/index.d.ts",
+			"default": "./dist/bun/index.js"
+		},
 		"./browser": {
 			"types": "./dist/browser/index.d.ts",
 			"default": "./dist/browser/index.js"

@@ -27,6 +27,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+          registry-url: "https://registry.npmjs.org"
 
       - run: pnpm install --frozen-lockfile
 
@@ -36,12 +37,16 @@ jobs:
 
       - run: pnpm run typecheck
 
+      # OIDC trusted publishing is implemented by the npm CLI (>= 11.5.1), not
+      # pnpm — so the publish step uses npm. Build/test/typecheck stay on pnpm.
+      - name: Upgrade npm (OIDC trusted publishing needs >= 11.5.1)
+        if: inputs.dry_run != 'true'
+        run: npm install -g npm@latest
+
       - name: Publish (dry run)
         if: inputs.dry_run == 'true'
-        run: pnpm publish --access public --no-git-checks --dry-run
+        run: npm publish --access public --dry-run
 
       - name: Publish
         if: inputs.dry_run != 'true'
-        env:
-          NPM_CONFIG_PROVENANCE: "true"
-        run: pnpm publish --access public --no-git-checks
+        run: npm publish --access public --provenance

@@ -25,6 +25,10 @@
 			"types": "./dist/browser/fetch/index.d.ts",
 			"default": "./dist/browser/fetch/index.js"
 		},
+		"./browser/react": {
+			"types": "./dist/browser/react/index.d.ts",
+			"default": "./dist/browser/react/index.js"
+		},
 		"./error": {
 			"types": "./dist/error/index.d.ts",
 			"default": "./dist/error/index.js"
@@ -79,7 +83,8 @@
 	},
 	"peerDependencies": {
 		"cli-highlight": ">=2.1.11",
-		"pino": ">=8.0.0"
+		"pino": ">=8.0.0",
+		"react": ">=18"
 	},
 	"peerDependenciesMeta": {
 		"cli-highlight": {
@@ -87,13 +92,18 @@
 		},
 		"pino": {
 			"optional": true
+		},
+		"react": {
+			"optional": true
 		}
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.6",
 		"@types/node": "^25.3.5",
+		"@types/react": "^19",
 		"husky": "^9.1.7",
 		"lint-staged": "^16.3.2",
+		"react": "^19",
 		"typedoc": "^0.28.17",
 		"typescript": "^5.9.3",
 		"vite": "^8.0.3",

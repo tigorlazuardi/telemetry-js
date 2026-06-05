@@ -7,6 +7,7 @@
 		"./src/bun/index.ts",
 		"./src/browser/index.ts",
 		"./src/browser/fetch/index.ts",
+		"./src/browser/react/index.ts",
 		"./src/error/index.ts",
 		"./src/db/index.ts",
 		"./src/context/index.ts",

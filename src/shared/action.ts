@@ -16,8 +16,44 @@
  * ```
  */
 
-import type { Span } from "@opentelemetry/api";
+import { type Histogram, metrics, type Span, type UpDownCounter } from "@opentelemetry/api";
 import { withTrace } from "./with-trace.js";
+
+let _hist: Histogram | undefined;
+let _active: UpDownCounter | undefined;
+
+function durationHistogram(): Histogram {
+	if (!_hist) {
+		_hist = metrics
+			.getMeter("@tigorhutasuhut/telemetry-js/ui-action")
+			.createHistogram("ui.action.duration", {
+				unit: "s",
+				description: "Duration of a UI action (success or failure), in seconds.",
+				advice: {
+					explicitBucketBoundaries: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+				},
+			});
+	}
+	return _hist;
+}
+
+function activeCounter(): UpDownCounter {
+	if (!_active) {
+		_active = metrics
+			.getMeter("@tigorhutasuhut/telemetry-js/ui-action")
+			.createUpDownCounter("ui.action.active", {
+				unit: "{action}",
+				description: "Number of UI actions currently in flight.",
+			});
+	}
+	return _active;
+}
+
+/** Internal: reset cached instruments (tests). @internal */
+export function _resetActionMetrics(): void {
+	_hist = undefined;
+	_active = undefined;
+}
 
 /**
  * Scope for UI action tracing — identifies where the action originates.
@@ -52,6 +88,9 @@ function buildAttributes(
  * The span is named `action` (or `Component.action` when a component is
  * provided) and carries `ui.action`, `ui.page`, and `ui.component` attributes.
  *
+ * Also emits metrics: `ui.action.duration` (Histogram, seconds) and
+ * `ui.action.active` (UpDownCounter) via the global MeterProvider.
+ *
  * @param action - Short action name (e.g. `"submit"`, `"toggle-password"`).
  * @param fn - The function to execute inside the span.
  * @param opts - Optional page/component scope and extra attributes.
@@ -66,11 +105,53 @@ function buildAttributes(
  * ```
  */
 export function withAction<T>(action: string, fn: (span: Span) => T, opts?: ActionOptions): T {
-	return withTrace(fn, {
-		name: action,
-		component: opts?.component,
-		attributes: buildAttributes(action, opts),
-	});
+	const baseAttrs: Record<string, string> = { "ui.action": action };
+	if (opts?.component) baseAttrs["ui.component"] = opts.component;
+	if (opts?.page) baseAttrs["ui.page"] = opts.page;
+
+	const hist = durationHistogram();
+	const active = activeCounter();
+	const start = performance.now();
+
+	const record = (errorType?: string) => {
+		const attrs = errorType ? { ...baseAttrs, "error.type": errorType } : baseAttrs;
+		hist.record((performance.now() - start) / 1000, attrs);
+	};
+	const errType = (e: unknown) =>
+		e instanceof Error ? e.name || e.constructor?.name || "Error" : "Error";
+
+	active.add(1, baseAttrs);
+
+	try {
+		const result = withTrace(fn, {
+			name: action,
+			component: opts?.component,
+			attributes: buildAttributes(action, opts),
+		});
+
+		if (result != null && typeof (result as unknown as PromiseLike<unknown>).then === "function") {
+			return (result as unknown as PromiseLike<unknown>).then(
+				(value) => {
+					active.add(-1, baseAttrs);
+					record();
+					return value;
+				},
+				(error: unknown) => {
+					active.add(-1, baseAttrs);
+					record(errType(error));
+					throw error;
+				},
+			) as T;
+		}
+
+		active.add(-1, baseAttrs);
+		record();
+		return result;
+	} catch (error) {
+		active.add(-1, baseAttrs);
+		record(errType(error));
+		throw error;
+	}
 }
 
 /**

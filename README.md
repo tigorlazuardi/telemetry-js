@@ -141,6 +141,72 @@ VITE_OTEL_SERVICE_NAMESPACE=my-team
 
 Before the `TracerProvider` is registered by `initSDK`, the OTel API returns a noop tracer — `fetch` works normally, just without tracing. Once the provider is up, every subsequent `fetch` call produces real CLIENT spans with W3C `traceparent`/`tracestate` header injection.
 
+## React Hooks — `browser/react`
+
+> **Peer dependency:** `react` >=18 is required. It is an optional peer dependency — not installed automatically.
+
+```bash
+pnpm add react
+```
+
+```ts
+import { useScopeAction, useAction } from "@tigorhutasuhut/telemetry-js/browser/react";
+```
+
+**Bundle impact:** only `react` is imported eagerly. The underlying OTel tracing/metrics code (`scopeAction`/`withAction`) loads **lazily** via dynamic `import()` on first render — non-blocking. If an action fires before the lazy load completes, the call awaits it (blocking-until-ready), then runs. Keeps the React bundle minimal.
+
+### `useScopeAction(scope)`
+
+Returns an async scoped action pre-filled with page and component context:
+
+```ts
+<T>(action: string, fn: () => Promise<T>, attrs?: Record<string, string>) => Promise<Awaited<T>>
+```
+
+Always returns a `Promise` — await it inside your handlers.
+
+### `useAction()`
+
+Returns a one-off async runner for ad-hoc actions without a fixed scope:
+
+```ts
+<T>(action: string, fn: () => Promise<T>, opts?: ActionOptions) => Promise<Awaited<T>>
+```
+
+### Example — form component
+
+```tsx
+import { useScopeAction } from "@tigorhutasuhut/telemetry-js/browser/react";
+
+function LoginForm() {
+  // Pre-fills ui.page (from the router) and ui.component ("LoginForm")
+  const action = useScopeAction("LoginForm");
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+
+    await action("user.login", async () => {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email: data.get("email"), password: data.get("password") }),
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) throw new Error("Login failed");
+      return res.json();
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input name="email" type="email" />
+      <input name="password" type="password" />
+      <button type="submit">Log in</button>
+    </form>
+  );
+}
+```
+
 ## `withTrace` — Manual Span Creation
 
 `withTrace` wraps a function in an OpenTelemetry span. It is re-exported from every runtime subpath (`/cloudflare`, `/node`, `/browser`).
@@ -536,6 +602,34 @@ const meter = metrics.getMeter("my-api");
 const counter = meter.createCounter("http.requests");
 counter.add(1, { method: "GET" });
 ```
+
+## UI Action Metrics
+
+`withAction`, `scopeAction`, and the React hooks (`useScopeAction` / `useAction`) automatically emit two OTel metrics. No extra setup is needed beyond a configured metrics endpoint (see [Quick Start — Browser](#quick-start--browser) and `metricsExporterEndpoint` in [Configuration Options](#configuration-options)).
+
+When no `MeterProvider` / metrics endpoint is configured the metrics go to a noop meter — zero effect, always safe to leave in.
+
+### Emitted metrics
+
+| Metric | Instrument | Unit | Description |
+| --- | --- | --- | --- |
+| `ui.action.duration` | Histogram | `s` | Time from action start to settle. Derive request rate (count), latency percentiles, and error rate from this single instrument. |
+| `ui.action.active` | UpDownCounter | `{action}` | In-flight actions gauge. Useful to spot stuck or overlapping actions. |
+
+`ui.action.duration` uses explicit bucket boundaries (in seconds): `0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10`.
+
+### Metric attributes
+
+All attributes are **low cardinality**:
+
+| Attribute | Set when | Notes |
+| --- | --- | --- |
+| `ui.action` | Always | The action name passed to `withAction` / `scopeAction` / the hook |
+| `ui.component` | When component scope is set | E.g. the `scope` arg to `useScopeAction` |
+| `ui.page` | When page scope is set | See cardinality warning below |
+| `error.type` | On failure only | Error class name (e.g. `TypeError`) |
+
+> **Cardinality warning:** use a route **template** for `ui.page` (e.g. `/users/:id`), never raw paths with user IDs or other high-cardinality values. Per-call free-form `attributes` passed to an action are recorded on the **span only** — they are intentionally excluded from metrics to keep metric cardinality bounded.
 
 ## Fetch-Based Exporters
 

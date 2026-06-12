@@ -156,6 +156,32 @@ export interface R2Bucket {
 	resumeMultipartUpload(key: string, uploadId: string): R2MultipartUpload;
 }
 
+// ── Queue types ───────────────────────────────────────────────────────────────
+
+/**
+ * Minimal message send request for `Queue.sendBatch`.
+ *
+ * Structural alias for `MessageSendRequest` from `@cloudflare/workers-types`.
+ */
+export interface MessageSendRequest<Body = unknown> {
+	body: Body;
+	options?: unknown;
+}
+
+/**
+ * Minimal `Queue` producer interface covering the methods wrapped by {@link instrumentQueue}.
+ *
+ * This covers only the **producer** side (`env.MY_QUEUE`). The consumer side is
+ * handled separately by `instrument().queue` in `instrument.ts`.
+ *
+ * Consumers may pass a real `Queue` (from `@cloudflare/workers-types`) —
+ * structural typing ensures compatibility.
+ */
+export interface Queue<Body = unknown> {
+	send(message: Body, options?: unknown): Promise<void>;
+	sendBatch(messages: Iterable<MessageSendRequest<Body>>, options?: unknown): Promise<void>;
+}
+
 // ── KV types ──────────────────────────────────────────────────────────────────
 
 /**

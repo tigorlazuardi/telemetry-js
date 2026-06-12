@@ -121,6 +121,8 @@ export type {
 	KVListResult,
 	KVNamespace,
 	KVPutOptions,
+	MessageSendRequest,
+	Queue,
 	R2Bucket,
 	R2MultipartUpload,
 	R2Object,
@@ -128,4 +130,10 @@ export type {
 	R2Objects,
 	TraceBindingOpts,
 } from "./bindings/index.js";
-export { instrumentD1, instrumentKV, instrumentR2, traceBinding } from "./bindings/index.js";
+export {
+	instrumentD1,
+	instrumentKV,
+	instrumentQueue,
+	instrumentR2,
+	traceBinding,
+} from "./bindings/index.js";

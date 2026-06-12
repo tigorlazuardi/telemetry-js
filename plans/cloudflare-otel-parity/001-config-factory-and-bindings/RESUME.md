@@ -1,7 +1,7 @@
 # RESUME — Cloudflare OTel Parity (Config Factory + Binding Wrappers)
 
 **Slice:** plans/cloudflare-otel-parity/001-config-factory-and-bindings/
-**Status:** in progress (tasks 001–004 done)
+**Status:** in progress (tasks 001–005 done)
 **Base branch:** main
 **Branch (when running):** ralph/cloudflare-otel-parity-001
 **Design spec:** docs/superpowers/specs/2026-06-12-cloudflare-otel-parity-design.md
@@ -15,7 +15,7 @@
 - [x] 002 Binding core + KV — done; trace-binding.ts (span+histogram, orphan guard, explicit buckets), config.ts (ensureSDK hook), kv.ts proxy; 18 tests incl continuity/orphan/redaction/buckets; opus-reviewed — attempts: 0 — review: opus
 - [x] 003 D1 — done; d1.ts (prepare→wrapped stmt, bind chains, terminal ops span once w/ db.statement, batch unwraps via RAW_STMT symbol, sqlVerb bounded metric); 15 tests; opus-reviewed — attempts: 0 — review: opus
 - [x] 004 R2 — done; r2.ts proxy (get/put/head/delete/list/createMultipartUpload), body stream untouched (bodyUsed=false verified), key rules incl delete-array skip; 23 tests; reviewed — attempts: 0 — review: sonnet
-- [ ] 005 Queue producer — attempts: 0 — review: sonnet
+- [x] 005 Queue producer — done; queue.ts proxy (send/sendBatch, PRODUCER kind, messaging.* semconv, sendBatch materializes iterable for count + no-drain); 14 tests; reviewed — attempts: 0 — review: sonnet
 - [ ] 006 DO storage — attempts: 0 — review: sonnet
 - [ ] 007 Docs: Starlight guides + TypeDoc — attempts: 0 — review: self
 - [ ] 008 Final full gate — attempts: 0 — review: sonnet

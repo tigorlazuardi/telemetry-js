@@ -230,6 +230,62 @@ Re-exported from `src/cloudflare/index.ts`. Each wrapper is a focused, independe
 
 ---
 
+## Feature C — Tail sampling (slice 002, separate from A/B)
+
+Decide whether to export a trace **after** it completes (so error/latency is known), instead of head-only at root start. Fits Cloudflare uniquely: **one isolate = one request = one whole trace in memory**, so buffer-until-end + decide is cheap and complete (no central collector), and the flush runs in `ctx.waitUntil` → zero added response latency.
+
+### Two layers, different jobs
+
+- **Head sampler** (OTel `Sampler`, at root start) — sets the `SAMPLED` flag → governs **downstream propagation**.
+- **Tail sampler** (`TailSampleFn`, at trace end over all local spans) — governs **local export** (keep/drop). Cannot un-export, so requires a **buffering** processor.
+
+```typescript
+export interface LocalTrace { traceId: string; localRootSpan: ReadableSpan; spans: ReadableSpan[]; }
+export type TailSampleFn = (t: LocalTrace) => boolean;
+
+// built-in tail samplers (exported)
+export const keepOnError: TailSampleFn;        // root span status === ERROR
+export const keepOnHeadSampled: TailSampleFn;  // SAMPLED flag set
+export const keepAll: TailSampleFn;
+export function keepOnSlow(thresholdMs: number): TailSampleFn;
+export function multiTailSampler(fns: TailSampleFn[]): TailSampleFn;  // OR-combine
+
+// SDKConfig addition
+sampling?: {
+  tailSampler?: TailSampleFn;   // default: multiTailSampler([keepOnHeadSampled, keepOnError])
+  headSampler?: Sampler;        // default: record-all (see nuance)
+  propagationRatio?: number;    // SAMPLED-flag ratio for downstream, default 1.0
+  maxBufferedSpans?: number;    // isolate memory cap, default 2048
+};
+```
+
+This default policy = the desired "error → force keep, otherwise fall to head decision".
+
+### The nuance (must get right)
+
+For "keep on error" to actually work, the head sampler must **RECORD every span** — OTel `Decision.NOT_RECORD` means the span is never created, so the tail processor never sees it and **cannot resurrect an errored trace head already dropped**. Therefore:
+
+- Default head sampler **records all** spans. Export-volume reduction comes from the **tail**, not the head.
+- The `SAMPLED` flag (propagation) is decoupled from recording via a custom sampler that returns `RECORD_AND_SAMPLED` with probability `propagationRatio`, else `RECORD` (recorded but flag unset). Never `NOT_RECORD`. Wrapped in `ParentBasedSampler` so incoming parent decisions are respected.
+
+### Interaction with Cloudflare tracing
+
+- **W3C propagation**: the `SAMPLED` bit is injected at the **outbound fetch** — a head decision made *before* errors are known. Tail cannot retroactively tell downstream to keep. So tail "force on error" is a **local** guarantee; cross-service it holds only if downstream also keeps-on-error. Default `propagationRatio: 1.0` propagates everything (downstream over-collects, stays coherent with local keeps); lower it to trade distributed completeness for cost.
+- **CF platform tracing** (Tail Workers / Trace Events / logpush) is a **separate pipeline** — untouched, no conflict.
+
+### Pipeline change
+
+Today the CF adapter uses `SimpleSpanProcessor` (export-per-span). Tail sampling needs a buffering `TailSampleSpanProcessor` (buffer spans by traceId; on root + all children ended → run `tailSampler` → export-or-drop; `forceFlush(traceId)` hooked into the request-end `ctx.waitUntil` flush; cap at `maxBufferedSpans`). **Non-breaking:** the tail processor is used ONLY when `sampling` is configured; with no `sampling` block the adapter keeps `SimpleSpanProcessor` and today's behaviour exactly.
+
+### Slice 002 tasks
+
+1. `TailSampleFn`/`LocalTrace` types + built-in samplers + `sampling` block in `SDKConfig` (public API → opus review).
+2. `TailSampleSpanProcessor` (buffer/decide/flush, memory cap) (core → opus review).
+3. Record-all + ratio-propagate head sampler, ParentBased wiring (public API → opus review).
+4. Adapter wiring: tail processor only when `sampling` set; hook `forceFlush(traceId)` into request-end flush (touches `adapter.ts`/`instrument.ts` → opus review).
+5. Docs: tail-sampling guide (the record-all nuance, propagation tension, CF synergy, examples) + TSDoc.
+6. Final gate.
+
 ## Rejected approaches
 
 - **Adopt `otel-cf-workers`** — regresses metrics+logs (traces-only), inherits a 13-month-stale RC dependency, gives up control of the CF engine.

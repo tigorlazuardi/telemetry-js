@@ -109,6 +109,17 @@ export {
 	instrumentWorkflow,
 } from "./workflow.js";
 
+// ── Tail-sampling utilities ─────────────────────────────────────────────────
+
+export type { LocalTrace, TailSampleFn } from "../shared/types.js";
+export {
+	keepAll,
+	keepOnError,
+	keepOnHeadSampled,
+	keepOnSlow,
+	multiTailSampler,
+} from "./sampling.js";
+
 // ── Binding instrumentation ─────────────────────────────────────────────────
 
 export type {

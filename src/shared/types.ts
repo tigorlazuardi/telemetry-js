@@ -6,6 +6,7 @@ import type {
 } from "@opentelemetry/api";
 import type { LoggerProvider } from "@opentelemetry/api-logs";
 import type { Resource } from "@opentelemetry/resources";
+import type { ReadableSpan, Sampler } from "@opentelemetry/sdk-trace-base";
 
 /**
  * Supported runtime identifiers.
@@ -14,6 +15,33 @@ import type { Resource } from "@opentelemetry/resources";
  * Any other string is accepted for custom adapters.
  */
 export type RuntimeName = "node" | "cloudflare-worker" | "browser" | (string & {});
+
+/**
+ * A complete local trace as buffered within one Cloudflare Worker isolate.
+ *
+ * Because a single isolate handles exactly one request, all spans for a given
+ * `traceId` are available in memory simultaneously — making tail-sampling
+ * both cheap and complete.
+ */
+export interface LocalTrace {
+	/** W3C hex trace ID shared by all spans in this trace. */
+	traceId: string;
+	/** Every span that belongs to this trace. */
+	spans: ReadableSpan[];
+	/**
+	 * The root span — the span with no `parentSpanContext`.
+	 * Status, duration, and trace flags are read from here for built-in samplers.
+	 */
+	rootSpan: ReadableSpan;
+}
+
+/**
+ * Decides whether a completed local trace should be exported.
+ *
+ * Return `true` to export all spans in the trace; `false` to drop them.
+ * Called once per trace, after the root span ends and all children have ended.
+ */
+export type TailSampleFn = (trace: LocalTrace) => boolean;
 
 /**
  * Configuration passed to {@link initSDK} to initialise tracing, metrics, and logging.
@@ -88,6 +116,42 @@ export interface SDKConfig {
 	 * - `"root"` — emit a root span regardless (opt-in, for top-level work outside a request).
 	 */
 	orphanBindingSpans?: "skip" | "root";
+
+	/**
+	 * Tail-sampling configuration (Cloudflare Workers only).
+	 *
+	 * When present, the Cloudflare adapter switches from `SimpleSpanProcessor`
+	 * to a buffering `TailSampleSpanProcessor`. With no `sampling` config the
+	 * adapter behaves exactly as before — export-per-span via `SimpleSpanProcessor`.
+	 */
+	sampling?: {
+		/**
+		 * Function deciding whether to export a completed trace.
+		 * Default: `multiTailSampler([keepOnHeadSampled, keepOnError])` — keep on
+		 * error OR on head-sampled propagation.
+		 */
+		tailSampler?: TailSampleFn;
+		/**
+		 * Custom head sampler. **Must never return `NOT_RECORD`** — the tail
+		 * sampler needs all spans in memory. Default: record-all sampler that
+		 * marks spans `RECORD_AND_SAMPLED` with probability `propagationRatio`,
+		 * else `RECORD` (never `NOT_RECORD`), wrapped in `ParentBasedSampler`.
+		 */
+		headSampler?: Sampler;
+		/**
+		 * Fraction (0–1) of traces to mark `SAMPLED` in the propagated W3C
+		 * `traceparent`. Affects downstream `keepOnHeadSampled` decisions and the
+		 * Cloudflare dashboard sampling — does **not** gate local recording.
+		 * Default `1.0` (propagate all as sampled).
+		 */
+		propagationRatio?: number;
+		/**
+		 * Maximum total spans buffered across all in-flight traces (default 2048).
+		 * When exceeded, the oldest incomplete trace is force-decided and flushed
+		 * early to prevent unbounded isolate memory growth.
+		 */
+		maxBufferedSpans?: number;
+	};
 
 	/**
 	 * Custom {@link ContextManager} to use for context propagation.

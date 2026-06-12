@@ -90,9 +90,11 @@ export type {
 	MessageRetryOptions,
 	MinimalExecutionContext,
 	QueueHandler,
+	ResolveConfigFn,
 	ScheduledController,
 	ScheduledHandler,
 	TraceHandlerOptions,
+	Trigger,
 } from "./instrument.js";
 export { instrument, traceHandler } from "./instrument.js";
 export type {

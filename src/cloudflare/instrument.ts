@@ -86,6 +86,39 @@ export interface ExportedHandler<Env = unknown> {
  */
 export interface InstrumentOptions extends Omit<SDKConfig, "runtime"> {}
 
+/**
+ * The event that triggered the current invocation.
+ * Passed as the second argument to a {@link ResolveConfigFn}.
+ *
+ * - `Request` — a `fetch` event.
+ * - `ScheduledController` — a `scheduled` event.
+ * - `MessageBatch` — a `queue` event.
+ * - `"do"` — a Durable Object or non-event entry point.
+ */
+export type Trigger = Request | ScheduledController | MessageBatch | "do";
+
+/**
+ * Per-invocation config resolver for {@link instrument}.
+ *
+ * Receives the request-time `env` and the triggering event, returns
+ * {@link InstrumentOptions} used only for that invocation.  Secrets and
+ * binding values (e.g. `env.OTEL_TOKEN`) are accessible here because the
+ * factory is called *inside* the handler, not at module load time.
+ *
+ * @example
+ * ```ts
+ * export default instrument(
+ *   { async fetch(req, env, ctx) { return new Response("ok"); } },
+ *   (env, trigger) => ({
+ *     serviceName: "my-worker",
+ *     exporterEndpoint: env.OTEL_ENDPOINT,
+ *     exporterHeaders: { Authorization: `Bearer ${env.OTEL_TOKEN}` },
+ *   }),
+ * );
+ * ```
+ */
+export type ResolveConfigFn<Env = unknown> = (env: Env, trigger: Trigger) => InstrumentOptions;
+
 let sdkResult: SDKResult | null = null;
 let fetchPatched = false;
 
@@ -217,6 +250,15 @@ function humanDuration(ms: number): string {
  * Options for {@link traceHandler}.
  */
 export interface TraceHandlerOptions<T = Response> extends InstrumentOptions {
+	/**
+	 * Optional per-request config factory.  When provided, it is resolved with
+	 * `(env, request)` and its result is merged into the options for this
+	 * invocation.  Useful when the static `InstrumentOptions` fields in this
+	 * object cannot carry secrets that only exist at request time.
+	 *
+	 * Throws → silently ignored (existing fail-silent contract).
+	 */
+	config?: InstrumentOptions | ResolveConfigFn;
 	/** Execution context — only `waitUntil` is required. Pass `undefined` during SSG/prerender. */
 	context: MinimalExecutionContext | undefined;
 	/**
@@ -304,11 +346,29 @@ export async function traceHandler<T = Response>(opts: TraceHandlerOptions<T>): 
 		logger: loggerOpt,
 		sensitiveHeaders,
 		maxBodyLogSize = DEFAULT_MAX_BODY_LOG_SIZE,
+		config: configOpt,
 		...sdkOpts
 	} = opts;
-	ensureSDK({ ...sdkOpts, env });
+
+	// Resolve per-request config factory if provided
+	let resolvedConfig: InstrumentOptions = {};
+	if (configOpt !== undefined) {
+		if (typeof configOpt === "function") {
+			try {
+				resolvedConfig = configOpt(env as unknown, request);
+			} catch {
+				// Fail-silent: factory threw, ignore and use base sdkOpts
+				resolvedConfig = {};
+			}
+		} else {
+			resolvedConfig = configOpt;
+		}
+	}
+	const mergedOpts = { ...sdkOpts, ...resolvedConfig };
+
+	ensureSDK({ ...mergedOpts, env });
 	ensureFetchPatched();
-	const tracer = trace.getTracer(opts.serviceName ?? "unknown");
+	const tracer = trace.getTracer(mergedOpts.serviceName ?? opts.serviceName ?? "unknown");
 	const url = new URL(request.url);
 	const extractedCtx = propagation.extract(context.active(), request.headers, headerGetter);
 	let span: Span | undefined;
@@ -495,37 +555,91 @@ export async function traceHandler<T = Response>(opts: TraceHandlerOptions<T>): 
 }
 
 /**
+ * Resolve a static or factory config for use inside a handler branch.
+ * Factory throws are swallowed (fail-silent); the base `fallback` is returned instead.
+ * @internal
+ */
+function resolveInstrumentConfig<Env>(
+	optsOrFactory: InstrumentOptions | ResolveConfigFn<Env> | undefined,
+	env: Env,
+	trigger: Trigger,
+): InstrumentOptions {
+	if (optsOrFactory === undefined) return {};
+	if (typeof optsOrFactory === "function") {
+		try {
+			return optsOrFactory(env, trigger);
+		} catch {
+			// Fail-silent: factory threw → noop config, worker still runs
+			console.error("[telemetry-js] ResolveConfigFn threw — falling back to noop config");
+			return {};
+		}
+	}
+	return optsOrFactory;
+}
+
+/**
  * Wrap a Cloudflare Worker handler with OpenTelemetry instrumentation.
+ *
+ * Accepts either a static config object or a per-request factory function as
+ * the second argument.  The factory form is useful when secrets (e.g.
+ * `env.OTEL_TOKEN`) only exist inside a request and cannot be captured at
+ * module load time.
  *
  * Each incoming `fetch`, `scheduled`, or `queue` event is traced as a span.
  * Spans are flushed via `ctx.waitUntil` so they don't block the response.
  *
  * @param handler - The original Cloudflare Worker `ExportedHandler` to instrument.
- * @param opts - SDK configuration options.
+ * @param opts - Static SDK configuration options (object form).
  * @returns A new `ExportedHandler` that traces every event.
  *
- * @example
+ * @example Object form (unchanged)
  * ```ts
- * import { instrument } from "@tigorhutasuhut/telemetry-js";
+ * import { instrument } from "@tigorhutasuhut/telemetry-js/cloudflare";
  *
- * export default instrument({
- *   async fetch(request, env, ctx) {
- *     return new Response("Hello");
- *   },
- * });
+ * export default instrument(
+ *   { async fetch(request, env, ctx) { return new Response("Hello"); } },
+ *   { serviceName: "my-worker" },
+ * );
+ * ```
+ *
+ * @example Factory form — secrets from `env`
+ * ```ts
+ * import { instrument } from "@tigorhutasuhut/telemetry-js/cloudflare";
+ *
+ * export default instrument(
+ *   { async fetch(request, env, ctx) { return new Response("Hello"); } },
+ *   (env, trigger) => ({
+ *     serviceName: "my-worker",
+ *     exporterEndpoint: env.OTEL_ENDPOINT,
+ *     exporterHeaders: { Authorization: `Bearer ${env.OTEL_TOKEN}` },
+ *   }),
+ * );
  * ```
  */
 export function instrument<Env = unknown>(
 	handler: ExportedHandler<Env>,
 	opts?: InstrumentOptions,
+): ExportedHandler<Env>;
+export function instrument<Env = unknown>(
+	handler: ExportedHandler<Env>,
+	resolveConfig: ResolveConfigFn<Env>,
+): ExportedHandler<Env>;
+export function instrument<Env = unknown>(
+	handler: ExportedHandler<Env>,
+	optsOrFactory?: InstrumentOptions | ResolveConfigFn<Env>,
 ): ExportedHandler<Env> {
-	const sdkConfig = opts ?? {};
-	sdkConfig.env = sdkConfig.env || globalThis.process?.env || {};
+	const isFactory = typeof optsOrFactory === "function";
+	// For the static object form, extract base config once (existing behaviour)
+	const staticConfig: InstrumentOptions = isFactory ? {} : (optsOrFactory ?? {});
+	staticConfig.env = staticConfig.env || globalThis.process?.env || {};
 	const result: ExportedHandler<Env> = {};
 
 	if (handler.fetch) {
 		const originalFetch = handler.fetch;
 		result.fetch = async (request: Request, env: Env, ctx: ExecutionContext): Promise<Response> => {
+			// Resolve config inside the handler so factory gets the live env + trigger
+			const resolvedConfig = resolveInstrumentConfig(optsOrFactory, env, request);
+			const sdkConfig = isFactory ? resolvedConfig : staticConfig;
 			const ee = { ...sdkConfig.env, ...(env as Record<string, unknown>) };
 			return traceHandler({
 				...sdkConfig,
@@ -546,6 +660,8 @@ export function instrument<Env = unknown>(
 			env: Env,
 			ctx: ExecutionContext,
 		): Promise<void> => {
+			const resolvedConfig = resolveInstrumentConfig(optsOrFactory, env, controller);
+			const sdkConfig = isFactory ? resolvedConfig : staticConfig;
 			ensureSDK(sdkConfig);
 			ensureFetchPatched();
 			const tracer = trace.getTracer(sdkConfig.serviceName ?? "unknown");
@@ -584,6 +700,8 @@ export function instrument<Env = unknown>(
 	if (handler.queue) {
 		const originalQueue = handler.queue;
 		result.queue = async (batch: MessageBatch, env: Env, ctx: ExecutionContext): Promise<void> => {
+			const resolvedConfig = resolveInstrumentConfig(optsOrFactory, env, batch);
+			const sdkConfig = isFactory ? resolvedConfig : staticConfig;
 			ensureSDK(sdkConfig);
 			ensureFetchPatched();
 			const tracer = trace.getTracer(sdkConfig.serviceName ?? "unknown");

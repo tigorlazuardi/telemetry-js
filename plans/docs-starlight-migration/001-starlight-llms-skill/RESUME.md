@@ -15,7 +15,7 @@
 - [x] 001 Scaffold docs/ workspace — attempts: 0
 - [x] 002 TypeDoc prebuild pipeline (per-runtime buckets) — attempts: 0
 - [x] 003 astro.config.mjs (starlight + llms-txt, whitespace:false, 5 sets) — attempts: 1
-- [ ] 004 getting-started/ pages — attempts: 0
+- [x] 004 getting-started/ pages — attempts: 1
 - [ ] 005 runtimes/node.md — attempts: 0
 - [ ] 006 runtimes/bun.md — attempts: 0
 - [ ] 007 runtimes/cloudflare.md — attempts: 0
@@ -32,9 +32,12 @@
 - 001: docs/package.json, docs/tsconfig.json, docs/src/content.config.ts, docs/src/content/docs/index.mdx, pnpm-workspace.yaml, .gitignore
 - 002: docs/typedoc.base.json, docs/scripts/gen-api.mjs
 - 003: docs/astro.config.mjs
+- 004: docs/src/content/docs/getting-started/{installation,subpath-exports,concepts}.md; docs/src/content.config.ts (docsLoader fix); docs/scripts/gen-api.mjs (title frontmatter injection)
 
 ## Key decisions made during execution
 - 003: Starlight v0.39.0 breaking change — `{ label, autogenerate }` sidebar groups removed. New syntax: `{ label, items: [{ autogenerate: { directory } }] }`. Collapsed: true moves to group level.
+- 001/004: Starlight 0.40.0 Content Layer API — `content.config.ts` must use `docsLoader()` from `@astrojs/starlight/loaders`. Old `defineCollection({ schema })` without loader = no pages built.
+- 002/004: TypeDoc-generated files have no frontmatter by default. `typedoc-plugin-frontmatter` only emits static globals. Solution: post-process in `gen-api.mjs` — extract H1 heading, unescape MD backslash sequences (e.g. `\<`), emit YAML single-quoted `title` frontmatter.
 
 ## Open questions / discovered-but-out-of-scope
 - (none yet)

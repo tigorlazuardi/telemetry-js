@@ -22,7 +22,7 @@ imports `browserAdapter` (full OTel SDK in eager chunk). Design approved: `DESIG
 ## Task progress (with attempt counters)
 - [x] 001 size-limit tooling + baseline — attempts: 0
 - [x] 002 SDKConfig.dev + createLogger console toggle — attempts: 0
-- [ ] 003 adapter wires config.dev → logger — attempts: 0
+- [x] 003 adapter wires config.dev → logger — attempts: 0
 - [ ] 004 passthrough.ts — attempts: 0
 - [ ] 005 internal/real.ts lazy chunk root — attempts: 0
 - [ ] 006 rewrite index.ts as facade (async initSDK) — attempts: 0

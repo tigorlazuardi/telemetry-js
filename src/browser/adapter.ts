@@ -121,7 +121,7 @@ export const browserAdapter: RuntimeAdapter = {
 				logs.setGlobalLoggerProvider(loggerProvider);
 			}
 
-			const logger = createLogger(resolvedServiceName);
+			const logger = createLogger(resolvedServiceName, { console: !!config.dev });
 			setDefaultLogger(logger);
 			for (const w of warnings) logger.warn(w);
 

@@ -272,6 +272,7 @@ For "keep on error" to actually work, the head sampler must **RECORD every span*
 
 - **W3C propagation**: the `SAMPLED` bit is injected at the **outbound fetch** — a head decision made *before* errors are known. Tail cannot retroactively tell downstream to keep. So tail "force on error" is a **local** guarantee; cross-service it holds only if downstream also keeps-on-error. Default `propagationRatio: 1.0` propagates everything (downstream over-collects, stays coherent with local keeps); lower it to trade distributed completeness for cost.
 - **CF platform tracing** (Tail Workers / Trace Events / logpush) is a **separate pipeline** — untouched, no conflict.
+- **wrangler `[observability] head_sampling_rate`** gates ONLY Cloudflare's native Workers-Logs/dashboard pipeline, NOT this library's userland OTLP `fetch` export. A rate `< 1` NEVER blocks tail-sampled error traces to the external collector — independent pipelines. CF head sampling has no error bias, so errored invocations can drop from the CF dashboard when rate `< 1`; keep `head_sampling_rate = 1` for a reliable CF-side backup (the library's tail `keepOnError` backstops the external collector regardless). This is a common misconfiguration — document it explicitly.
 
 ### Pipeline change
 

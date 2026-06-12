@@ -46,6 +46,50 @@ export interface KVListResult {
 	cursor?: string;
 }
 
+// ── D1 types ──────────────────────────────────────────────────────────────────
+
+/** Result returned by D1 statement execution methods. */
+export interface D1Result<T = unknown> {
+	results: T[];
+	success: boolean;
+	meta: unknown;
+}
+
+/** Result returned by D1 `exec`. */
+export interface D1ExecResult {
+	count: number;
+	duration: number;
+}
+
+/**
+ * Minimal `D1PreparedStatement` interface covering methods wrapped by {@link instrumentD1}.
+ *
+ * Consumers may pass a real `D1PreparedStatement` (from `@cloudflare/workers-types`) —
+ * structural typing ensures compatibility.
+ */
+export interface D1PreparedStatement {
+	bind(...values: unknown[]): D1PreparedStatement;
+	first<T = unknown>(colName?: string): Promise<T | null>;
+	all<T = unknown>(): Promise<D1Result<T>>;
+	run<T = unknown>(): Promise<D1Result<T>>;
+	raw<T = unknown>(options?: { columnNames?: boolean }): Promise<T[]>;
+}
+
+/**
+ * Minimal `D1Database` interface covering the methods wrapped by {@link instrumentD1}.
+ *
+ * Consumers may pass a real `D1Database` (from `@cloudflare/workers-types`) —
+ * structural typing ensures compatibility.
+ */
+export interface D1Database {
+	prepare(query: string): D1PreparedStatement;
+	batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]>;
+	exec(query: string): Promise<D1ExecResult>;
+	dump(): Promise<ArrayBuffer>;
+}
+
+// ── KV types ──────────────────────────────────────────────────────────────────
+
 /**
  * Minimal `KVNamespace` interface covering the methods wrapped by {@link instrumentKV}.
  *

@@ -112,6 +112,10 @@ export {
 // ── Binding instrumentation ─────────────────────────────────────────────────
 
 export type {
+	D1Database,
+	D1ExecResult,
+	D1PreparedStatement,
+	D1Result,
 	KVGetOptions,
 	KVListOptions,
 	KVListResult,
@@ -119,4 +123,4 @@ export type {
 	KVPutOptions,
 	TraceBindingOpts,
 } from "./bindings/index.js";
-export { instrumentKV, traceBinding } from "./bindings/index.js";
+export { instrumentD1, instrumentKV, traceBinding } from "./bindings/index.js";

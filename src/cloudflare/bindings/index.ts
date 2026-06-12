@@ -5,10 +5,15 @@
  * and a `cloudflare.binding.operation.duration` histogram to every binding call.
  */
 
+export { instrumentD1 } from "./d1.js";
 export { instrumentKV } from "./kv.js";
 export type { TraceBindingOpts } from "./trace-binding.js";
 export { traceBinding } from "./trace-binding.js";
 export type {
+	D1Database,
+	D1ExecResult,
+	D1PreparedStatement,
+	D1Result,
 	KVGetOptions,
 	KVListOptions,
 	KVListResult,

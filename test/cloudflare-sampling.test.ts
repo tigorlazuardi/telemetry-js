@@ -1,6 +1,9 @@
-import { SpanStatusCode, TraceFlags } from "@opentelemetry/api";
+import type { Context } from "@opentelemetry/api";
+import { ROOT_CONTEXT, SpanStatusCode, TraceFlags, trace } from "@opentelemetry/api";
+import { SamplingDecision } from "@opentelemetry/sdk-trace-base";
 import { describe, expect, it } from "vitest";
 import {
+	createRecordAllHeadSampler,
 	keepAll,
 	keepOnError,
 	keepOnHeadSampled,
@@ -138,5 +141,70 @@ describe("multiTailSampler", () => {
 	it("returns false for empty sampler list", () => {
 		const trace = makeTrace({ statusCode: SpanStatusCode.ERROR });
 		expect(multiTailSampler([])(trace)).toBe(false);
+	});
+});
+
+describe("createRecordAllHeadSampler", () => {
+	function makeParentCtx(sampled: boolean): Context {
+		const spanCtx = {
+			traceId: "a".repeat(32),
+			spanId: "b".repeat(16),
+			traceFlags: sampled ? TraceFlags.SAMPLED : TraceFlags.NONE,
+			isRemote: true,
+		};
+		return trace.setSpanContext(ROOT_CONTEXT, spanCtx);
+	}
+
+	it("ratio 1.0 → always RECORD_AND_SAMPLED for root spans", () => {
+		const sampler = createRecordAllHeadSampler(1.0);
+		const result = sampler.shouldSample(ROOT_CONTEXT, "a".repeat(32), "test", 0, {}, []);
+		expect(result.decision).toBe(SamplingDecision.RECORD_AND_SAMPLED);
+	});
+
+	it("ratio 0.0 → always RECORD (never NOT_RECORD) for root spans", () => {
+		const sampler = createRecordAllHeadSampler(0.0);
+		const result = sampler.shouldSample(ROOT_CONTEXT, "a".repeat(32), "test", 0, {}, []);
+		expect(result.decision).toBe(SamplingDecision.RECORD);
+	});
+
+	it("never returns NOT_RECORD for any ratio", () => {
+		const sampler = createRecordAllHeadSampler(0.0);
+		const traceIds = [
+			"0".repeat(32),
+			"f".repeat(32),
+			"a1b2c3d4e5f60000a1b2c3d4e5f60000",
+			"deadbeef".repeat(4),
+		];
+		for (const id of traceIds) {
+			const result = sampler.shouldSample(ROOT_CONTEXT, id, "test", 0, {}, []);
+			expect(result.decision).not.toBe(SamplingDecision.NOT_RECORD);
+		}
+	});
+
+	it("remote sampled parent → RECORD_AND_SAMPLED (follow remote)", () => {
+		const sampler = createRecordAllHeadSampler(0.0); // ratio 0 to force RECORD for root
+		const ctx = makeParentCtx(true);
+		const result = sampler.shouldSample(ctx, "b".repeat(32), "child", 0, {}, []);
+		expect(result.decision).toBe(SamplingDecision.RECORD_AND_SAMPLED);
+	});
+
+	it("remote NOT-sampled parent → RECORD (not NOT_RECORD)", () => {
+		const sampler = createRecordAllHeadSampler(1.0);
+		const ctx = makeParentCtx(false);
+		const result = sampler.shouldSample(ctx, "c".repeat(32), "child", 0, {}, []);
+		expect(result.decision).toBe(SamplingDecision.RECORD);
+	});
+
+	it("toString includes ratio", () => {
+		const sampler = createRecordAllHeadSampler(0.5);
+		expect(sampler.toString()).toContain("0.5");
+	});
+
+	it("ratio 1.0 → RECORD_AND_SAMPLED even for traceId that accumulates to 0xffffffff", () => {
+		// "ffffffff" + zeros accumulates to 0xffffffff which would fail `< 0xffffffff` without the saturated short-circuit
+		const sampler = createRecordAllHeadSampler(1.0);
+		const edgeId = "ffffffff" + "0".repeat(24);
+		const result = sampler.shouldSample(ROOT_CONTEXT, edgeId, "test", 0, {}, []);
+		expect(result.decision).toBe(SamplingDecision.RECORD_AND_SAMPLED);
 	});
 });

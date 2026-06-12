@@ -113,6 +113,7 @@ export {
 
 export type { LocalTrace, TailSampleFn } from "../shared/types.js";
 export {
+	createRecordAllHeadSampler,
 	keepAll,
 	keepOnError,
 	keepOnHeadSampled,

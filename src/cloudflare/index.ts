@@ -90,9 +90,11 @@ export type {
 	MessageRetryOptions,
 	MinimalExecutionContext,
 	QueueHandler,
+	ResolveConfigFn,
 	ScheduledController,
 	ScheduledHandler,
 	TraceHandlerOptions,
+	Trigger,
 } from "./instrument.js";
 export { instrument, traceHandler } from "./instrument.js";
 export type {
@@ -106,3 +108,34 @@ export {
 	injectContext,
 	instrumentWorkflow,
 } from "./workflow.js";
+
+// ── Binding instrumentation ─────────────────────────────────────────────────
+
+export type {
+	D1Database,
+	D1ExecResult,
+	D1PreparedStatement,
+	D1Result,
+	DurableObjectStorage,
+	KVGetOptions,
+	KVListOptions,
+	KVListResult,
+	KVNamespace,
+	KVPutOptions,
+	MessageSendRequest,
+	Queue,
+	R2Bucket,
+	R2MultipartUpload,
+	R2Object,
+	R2ObjectBody,
+	R2Objects,
+	TraceBindingOpts,
+} from "./bindings/index.js";
+export {
+	instrumentD1,
+	instrumentDOStorage,
+	instrumentKV,
+	instrumentQueue,
+	instrumentR2,
+	traceBinding,
+} from "./bindings/index.js";

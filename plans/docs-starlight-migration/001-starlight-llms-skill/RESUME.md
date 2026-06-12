@@ -16,10 +16,10 @@
 - [x] 002 TypeDoc prebuild pipeline (per-runtime buckets) — attempts: 0
 - [x] 003 astro.config.mjs (starlight + llms-txt, whitespace:false, 5 sets) — attempts: 1
 - [x] 004 getting-started/ pages — attempts: 1
-- [ ] 005 runtimes/node.md — attempts: 0
-- [ ] 006 runtimes/bun.md — attempts: 0
-- [ ] 007 runtimes/cloudflare.md — attempts: 0
-- [ ] 008 runtimes/browser.md — attempts: 0
+- [x] 005 runtimes/node.md — attempts: 0
+- [x] 006 runtimes/bun.md — attempts: 0
+- [x] 007 runtimes/cloudflare.md — attempts: 0
+- [x] 008 runtimes/browser.md — attempts: 0
 - [ ] 009 guides/*.md (11) — attempts: 0
 - [ ] 010 landing index.mdx + CopyLlmsUrl.astro — attempts: 0
 - [ ] 011 verify llms output (emit + whitespace) — attempts: 0
@@ -33,6 +33,7 @@
 - 002: docs/typedoc.base.json, docs/scripts/gen-api.mjs
 - 003: docs/astro.config.mjs
 - 004: docs/src/content/docs/getting-started/{installation,subpath-exports,concepts}.md; docs/src/content.config.ts (docsLoader fix); docs/scripts/gen-api.mjs (title frontmatter injection)
+- 005-008: docs/src/content/docs/runtimes/{node,bun,cloudflare,browser}.md
 
 ## Key decisions made during execution
 - 003: Starlight v0.39.0 breaking change — `{ label, autogenerate }` sidebar groups removed. New syntax: `{ label, items: [{ autogenerate: { directory } }] }`. Collapsed: true moves to group level.

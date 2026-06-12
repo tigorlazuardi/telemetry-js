@@ -58,6 +58,13 @@ export interface SDKConfig {
 	instrumentations?: unknown[];
 
 	/**
+	 * Enable development mode. When `true`, the browser adapter gates all
+	 * console output through this flag — logs are silent until `dev: true`.
+	 * Has no effect on Node.js, Cloudflare Workers, or Bun adapters.
+	 */
+	dev?: boolean;
+
+	/**
 	 * Custom {@link ContextManager} to use for context propagation.
 	 *
 	 * When omitted, a runtime-appropriate default is used:

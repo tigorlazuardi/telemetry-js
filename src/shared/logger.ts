@@ -426,7 +426,7 @@ function createConsoleWriter(serviceName: string | undefined): StderrWriter {
  *
  * Every method is wrapped in try-catch — **never throws**.
  */
-export function createLogger(serviceName?: string): Logger {
+export function createLogger(serviceName?: string, options?: { console?: boolean }): Logger {
 	let stderrWriter: StderrWriter;
 
 	if (isNode()) {
@@ -441,10 +441,12 @@ export function createLogger(serviceName?: string): Logger {
 	}
 
 	function log(level: LogLevel, message: string, attrs?: LogAttributes, opts?: LogOptions): void {
-		try {
-			stderrWriter(level, message, attrs, opts);
-		} catch {
-			// Never throw
+		if (options?.console !== false) {
+			try {
+				stderrWriter(level, message, attrs, opts);
+			} catch {
+				// Never throw
+			}
 		}
 		emitOtlp(serviceName, level, message, attrs, opts);
 	}

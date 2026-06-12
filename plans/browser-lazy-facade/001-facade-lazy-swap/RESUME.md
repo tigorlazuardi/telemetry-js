@@ -21,7 +21,7 @@ imports `browserAdapter` (full OTel SDK in eager chunk). Design approved: `DESIG
 
 ## Task progress (with attempt counters)
 - [x] 001 size-limit tooling + baseline — attempts: 0
-- [ ] 002 SDKConfig.dev + createLogger console toggle — attempts: 0
+- [x] 002 SDKConfig.dev + createLogger console toggle — attempts: 0
 - [ ] 003 adapter wires config.dev → logger — attempts: 0
 - [ ] 004 passthrough.ts — attempts: 0
 - [ ] 005 internal/real.ts lazy chunk root — attempts: 0
@@ -36,3 +36,4 @@ imports `browserAdapter` (full OTel SDK in eager chunk). Design approved: `DESIG
 
 ## Decisions / notes log
 - 001: Added @size-limit/file@12 (alongside @size-limit/esbuild@11) — `path` field requires file plugin. Baseline: /browser=30.17kB, /browser/fetch=4.31kB, /browser/react=5.73kB (brotli, esbuild bundled).
+- 002: Added `dev?: boolean` to SDKConfig. Added `options?: { console?: boolean }` to createLogger — default true (console ON), flag false suppresses stderrWriter only (OTLP still emits). Pre-existing flaky test "colors later TTY logs" unrelated to this change.

@@ -32,7 +32,7 @@ Import from the subpath that matches your runtime. Each subpath only bundles the
 | --- | --- | --- |
 | `@tigorhutasuhut/telemetry-js/cloudflare` | Cloudflare Workers | Full SDK with fetch-based exporters |
 | `@tigorhutasuhut/telemetry-js/node` | Node.js / Bun | Full SDK with OTel HTTP exporters |
-| `@tigorhutasuhut/telemetry-js/browser` | Browser (Vite, etc.) | Full SDK with fetch-based exporters |
+| `@tigorhutasuhut/telemetry-js/browser` | Browser (Vite, etc.) | Lazy facade — pure-JS eager chunk, heavy SDK loads on `initSDK()` |
 | `@tigorhutasuhut/telemetry-js/browser/fetch` | Browser | Lightweight `instrumentFetch()` only (~2 KB, zero OTel deps at import time) |
 | `@tigorhutasuhut/telemetry-js/error` | All | `AppError` class for structured application errors |
 | `@tigorhutasuhut/telemetry-js/db` | All | `withQueryName` / `getQueryName` for query naming via OTel context |
@@ -114,12 +114,13 @@ Then in your telemetry wrapper (`lib/telemetry.ts`):
 ```ts
 import { initSDK, type SDKConfig } from "@tigorhutasuhut/telemetry-js/browser";
 
-export function initTelemetry(config: { endpoint: string; enabled?: boolean }) {
+export async function initTelemetry(config: { endpoint: string; enabled?: boolean }) {
   if (!config.enabled) return;
 
-  initSDK({
+  await initSDK({
     serviceName: import.meta.env.VITE_OTEL_SERVICE_NAME ?? "my-spa",
     exporterEndpoint: config.endpoint,
+    dev: import.meta.env.DEV, // console output in dev, silent in prod
     resourceAttributes: {
       "deployment.environment.name": import.meta.env.VITE_OTEL_DEPLOYMENT_ENV,
       "service.namespace": import.meta.env.VITE_OTEL_SERVICE_NAMESPACE,
@@ -140,6 +141,18 @@ VITE_OTEL_SERVICE_NAMESPACE=my-team
 ```
 
 Before the `TracerProvider` is registered by `initSDK`, the OTel API returns a noop tracer — `fetch` works normally, just without tracing. Once the provider is up, every subsequent `fetch` call produces real CLIENT spans with W3C `traceparent`/`tracestate` header injection.
+
+The `/browser` entry point is a **pure-JS lazy facade**: it has zero OTel dependencies at import time and passes calls through synchronously until `initSDK()` resolves. The heavy SDK chunk only loads when `initSDK` is awaited, keeping initial bundle weight minimal.
+
+#### New: `/browser/sdk` subpath
+
+Power users who need direct access to exporters, providers, or `StackContextManager` can import from the dedicated heavy subpath:
+
+```ts
+import { FetchTraceExporter, StackContextManager } from "@tigorhutasuhut/telemetry-js/browser/sdk";
+```
+
+> **Note:** `FetchTraceExporter`, `FetchMetricExporter`, `FetchLogExporter`, `metrics`, and related logger utilities have moved from `/browser` to `/browser/sdk` in v1.12. If you imported them from `/browser` directly, update to `/browser/sdk`.
 
 ## React Hooks — `browser/react`
 

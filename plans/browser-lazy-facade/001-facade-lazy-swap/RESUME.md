@@ -33,7 +33,7 @@ imports `browserAdapter` (full OTel SDK in eager chunk). Design approved: `DESIG
 - [x] 007 sdk.ts subpath + package exports — attempts: 0
 - [x] 008 tests — attempts: 0
 - [x] 009 size budgets + after numbers — attempts: 0
-- [ ] 010 docs + CI size job — attempts: 0
+- [x] 010 docs + CI size job — attempts: 0
 
 ## Open questions
 (none — design fully specified)

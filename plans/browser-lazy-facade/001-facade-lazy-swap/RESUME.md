@@ -26,7 +26,7 @@ imports `browserAdapter` (full OTel SDK in eager chunk). Design approved: `DESIG
 - [x] 004 passthrough.ts — attempts: 0
 - [x] 005 internal/real.ts lazy chunk root — attempts: 0
 - [x] 006 rewrite index.ts as facade (async initSDK) — attempts: 0
-- [ ] 007 sdk.ts subpath + package exports — attempts: 0
+- [x] 007 sdk.ts subpath + package exports — attempts: 0
 - [ ] 008 tests — attempts: 0
 - [ ] 009 size budgets + after numbers — attempts: 0
 - [ ] 010 docs + CI size job — attempts: 0
@@ -41,3 +41,4 @@ imports `browserAdapter` (full OTel SDK in eager chunk). Design approved: `DESIG
 - 004: Created src/browser/passthrough.ts — pure-JS, zero @opentelemetry imports. Exports: passthroughLogger (silent noop), passthroughWithTrace/WithAction/ScopeAction (run fn(NOOP_SPAN)), passthroughTraced (returns original method), passthroughInjectContext (returns carrier unchanged), makePassthroughSDKResult (null resource, as-any provider).
 - 005: Created src/browser/internal/real.ts — lazy chunk root. Bundles all heavy OTel via impl object: withTrace, withAction, scopeAction, traced, injectContext, createLogger, setDefaultLogger, setup (delegates to browserAdapter).
 - 006: Rewrote src/browser/index.ts as pure-JS lazy facade. initSDK async + idempotent (_initPromise guard), failure→makePassthroughSDKResult. Thin forwarders for all 5 API fns. Dropped: metrics, FetchExporters, logger fns, noopSDKResult, instrumentFetch. Opus review: LGTM, all 10 criteria pass. Comment-only issue fixed (endpoint→exporterEndpoint in docstring).
+- 007: Created src/browser/sdk/index.ts — heavy opt-in subpath. Exports: FetchTraceExporters, metrics, StackContextManager, BasicTracerProvider, MeterProvider, LoggerProvider + logger fns + noopSDKResult. Added ./browser/sdk to package.json exports. Added /browser/sdk size-limit entry (no limit yet — task 009 sets budgets). Removed @internal from StackContextManager (it's now public API in /browser/sdk). Opus review: LGTM, all 6 criteria pass.

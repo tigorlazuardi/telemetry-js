@@ -29,6 +29,10 @@
 			"types": "./dist/browser/react/index.d.ts",
 			"default": "./dist/browser/react/index.js"
 		},
+		"./browser/sdk": {
+			"types": "./dist/browser/sdk/index.d.ts",
+			"default": "./dist/browser/sdk/index.js"
+		},
 		"./error": {
 			"types": "./dist/error/index.d.ts",
 			"default": "./dist/error/index.js"

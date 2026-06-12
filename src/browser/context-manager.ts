@@ -10,7 +10,6 @@
  * interleaving of unrelated traces — which holds for typical browser SPAs
  * where user actions are sequential.
  *
- * @internal
  */
 
 import { type Context, type ContextManager, ROOT_CONTEXT } from "@opentelemetry/api";

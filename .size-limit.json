@@ -10,5 +10,9 @@
 	{
 		"name": "/browser/react",
 		"path": "dist/browser/react/index.js"
+	},
+	{
+		"name": "/browser/sdk",
+		"path": "dist/browser/sdk/index.js"
 	}
 ]

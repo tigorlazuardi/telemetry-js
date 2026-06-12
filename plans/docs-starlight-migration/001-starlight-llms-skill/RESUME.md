@@ -23,7 +23,7 @@
 - [x] 009 guides/*.md (12 created) — attempts: 0
 - [x] 010 landing index.mdx + CopyLlmsUrl.astro — attempts: 0
 - [x] 011 verify llms output (emit + whitespace) — attempts: 0
-- [ ] 012 trim README — attempts: 0
+- [x] 012 trim README — attempts: 0
 - [ ] 013 generator skill + package.json files — attempts: 0  (review: opus)
 - [ ] 014 reconcile root package.json + drop HTML typedoc — attempts: 0  (review: opus)
 - [ ] 015 CI docs build + Pages deploy — attempts: 0
@@ -37,6 +37,7 @@
 - 009: docs/src/content/docs/guides/{with-trace,trace-handler,context,database-naming,endpoint-resolution,logger,metrics,ui-action-metrics,exporters,configuration,resource-validation,instrument-fetch}.md
 - 010: docs/src/content/docs/index.mdx (splash + CopyLlmsUrl), docs/src/components/CopyLlmsUrl.astro
 - 011: verified llms.txt + llms-full.txt emitted (18 + 19751 lines), 5 custom sets in _llms-txt/, whitespace:false confirmed
+- 012: README.md trimmed to 65 lines (was 734); docs site + llms.txt links present
 
 ## Key decisions made during execution
 - 003: Starlight v0.39.0 breaking change — `{ label, autogenerate }` sidebar groups removed. New syntax: `{ label, items: [{ autogenerate: { directory } }] }`. Collapsed: true moves to group level.

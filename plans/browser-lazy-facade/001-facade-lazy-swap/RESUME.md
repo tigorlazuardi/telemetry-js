@@ -23,7 +23,7 @@ imports `browserAdapter` (full OTel SDK in eager chunk). Design approved: `DESIG
 - [x] 001 size-limit tooling + baseline — attempts: 0
 - [x] 002 SDKConfig.dev + createLogger console toggle — attempts: 0
 - [x] 003 adapter wires config.dev → logger — attempts: 0
-- [ ] 004 passthrough.ts — attempts: 0
+- [x] 004 passthrough.ts — attempts: 0
 - [ ] 005 internal/real.ts lazy chunk root — attempts: 0
 - [ ] 006 rewrite index.ts as facade (async initSDK) — attempts: 0
 - [ ] 007 sdk.ts subpath + package exports — attempts: 0
@@ -37,3 +37,5 @@ imports `browserAdapter` (full OTel SDK in eager chunk). Design approved: `DESIG
 ## Decisions / notes log
 - 001: Added @size-limit/file@12 (alongside @size-limit/esbuild@11) — `path` field requires file plugin. Baseline: /browser=30.17kB, /browser/fetch=4.31kB, /browser/react=5.73kB (brotli, esbuild bundled).
 - 002: Added `dev?: boolean` to SDKConfig. Added `options?: { console?: boolean }` to createLogger — default true (console ON), flag false suppresses stderrWriter only (OTLP still emits). Pre-existing flaky test "colors later TTY logs" unrelated to this change.
+- 003: Wired `config.dev` → `createLogger(resolvedServiceName, { console: !!config.dev })` in browser adapter. One-line change, all other adapters unchanged.
+- 004: Created src/browser/passthrough.ts — pure-JS, zero @opentelemetry imports. Exports: passthroughLogger (silent noop), passthroughWithTrace/WithAction/ScopeAction (run fn(NOOP_SPAN)), passthroughTraced (returns original method), passthroughInjectContext (returns carrier unchanged), makePassthroughSDKResult (null resource, as-any provider).

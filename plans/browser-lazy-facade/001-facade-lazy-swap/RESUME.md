@@ -13,12 +13,14 @@ imports `browserAdapter` (full OTel SDK in eager chunk). Design approved: `DESIG
 - Loop status: active
 
 ## Bundle-size benchmark
-- Baseline `/browser` (full SDK, gz): _TBD — capture in task 001_
-- After `/browser` facade (gz): _TBD — task 009_
+- Baseline `/browser` (full SDK, brotli): 30.17 kB
+- Baseline `/browser/fetch` (brotli): 4.31 kB
+- Baseline `/browser/react` (brotli): 5.73 kB
+- After `/browser` facade (brotli): _TBD — task 009_
 - Delta: _TBD_
 
 ## Task progress (with attempt counters)
-- [ ] 001 size-limit tooling + baseline — attempts: 0
+- [x] 001 size-limit tooling + baseline — attempts: 0
 - [ ] 002 SDKConfig.dev + createLogger console toggle — attempts: 0
 - [ ] 003 adapter wires config.dev → logger — attempts: 0
 - [ ] 004 passthrough.ts — attempts: 0
@@ -33,4 +35,4 @@ imports `browserAdapter` (full OTel SDK in eager chunk). Design approved: `DESIG
 (none — design fully specified)
 
 ## Decisions / notes log
-(empty — append per iteration: task #, files touched, key decision)
+- 001: Added @size-limit/file@12 (alongside @size-limit/esbuild@11) — `path` field requires file plugin. Baseline: /browser=30.17kB, /browser/fetch=4.31kB, /browser/react=5.73kB (brotli, esbuild bundled).

@@ -1,0 +1,14 @@
+[
+	{
+		"name": "/browser",
+		"path": "dist/browser/index.js"
+	},
+	{
+		"name": "/browser/fetch",
+		"path": "dist/browser/fetch/index.js"
+	},
+	{
+		"name": "/browser/react",
+		"path": "dist/browser/react/index.js"
+	}
+]

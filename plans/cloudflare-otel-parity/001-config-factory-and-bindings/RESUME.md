@@ -17,7 +17,7 @@
 - [x] 004 R2 — done; r2.ts proxy (get/put/head/delete/list/createMultipartUpload), body stream untouched (bodyUsed=false verified), key rules incl delete-array skip; 23 tests; reviewed — attempts: 0 — review: sonnet
 - [x] 005 Queue producer — done; queue.ts proxy (send/sendBatch, PRODUCER kind, messaging.* semconv, sendBatch materializes iterable for count + no-drain); 14 tests; reviewed — attempts: 0 — review: sonnet
 - [x] 006 DO storage — done; do-storage.ts proxy (get/put/delete/list/deleteAll, single-string key rules, state.storage example); 24 tests; reviewed — attempts: 0 — review: sonnet
-- [ ] 007 Docs: Starlight guides + TypeDoc — attempts: 0 — review: self
+- [x] 007 Docs — done; 2 Starlight guides (per-request-config, binding-tracing), auto-sidebar + auto-llms-txt; TypeDoc API bucket regenerates new exports (verified instrumentKV/D1/ResolveConfigFn md generated); docs:generate exit 0 (280 pages) — attempts: 0 — review: self
 - [ ] 008 Final full gate — attempts: 0 — review: sonnet
 
 ## Files touched

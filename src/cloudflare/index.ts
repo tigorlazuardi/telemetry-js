@@ -108,3 +108,15 @@ export {
 	injectContext,
 	instrumentWorkflow,
 } from "./workflow.js";
+
+// ── Binding instrumentation ─────────────────────────────────────────────────
+
+export type {
+	KVGetOptions,
+	KVListOptions,
+	KVListResult,
+	KVNamespace,
+	KVPutOptions,
+	TraceBindingOpts,
+} from "./bindings/index.js";
+export { instrumentKV, traceBinding } from "./bindings/index.js";

@@ -65,6 +65,31 @@ export interface SDKConfig {
 	dev?: boolean;
 
 	/**
+	 * Capture binding keys (`kv.key`, `r2.key`, `do.storage.key`) as span attributes.
+	 *
+	 * **PII risk** — keys may contain user-identifiable data. Defaults to `false`.
+	 * Set to `true` to opt in to key capture (span-only; keys are never added to metric labels).
+	 */
+	bindingCaptureKeys?: boolean;
+
+	/**
+	 * Explicit histogram bucket boundaries in **milliseconds** for `cloudflare.binding.operation.duration`.
+	 *
+	 * Defaults to `[1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000]` — tuned for
+	 * Cloudflare edge-storage latencies. Override to match your p99 targets.
+	 */
+	bindingHistogramBoundaries?: number[];
+
+	/**
+	 * What to do when a binding operation is called with no active recording span.
+	 *
+	 * - `"skip"` *(default)* — record only the duration metric; emit no span. Prevents
+	 *   disconnected root spans that would carry a different `traceId` than the request.
+	 * - `"root"` — emit a root span regardless (opt-in, for top-level work outside a request).
+	 */
+	orphanBindingSpans?: "skip" | "root";
+
+	/**
 	 * Custom {@link ContextManager} to use for context propagation.
 	 *
 	 * When omitted, a runtime-appropriate default is used:

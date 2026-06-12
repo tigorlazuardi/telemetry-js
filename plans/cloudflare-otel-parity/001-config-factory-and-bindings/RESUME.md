@@ -1,7 +1,7 @@
 # RESUME — Cloudflare OTel Parity (Config Factory + Binding Wrappers)
 
 **Slice:** plans/cloudflare-otel-parity/001-config-factory-and-bindings/
-**Status:** in progress (task 001 done)
+**Status:** in progress (tasks 001–002 done)
 **Base branch:** main
 **Branch (when running):** ralph/cloudflare-otel-parity-001
 **Design spec:** docs/superpowers/specs/2026-06-12-cloudflare-otel-parity-design.md
@@ -12,7 +12,7 @@
 
 ## Task progress (with attempt counters)
 - [x] 001 Config factory overload (ResolveConfigFn + Trigger) — done, instrument.ts overload + traceHandler config field; 12 new tests, 35 regression pass; opus-reviewed — attempts: 0 — review: opus
-- [ ] 002 Binding core + KV (traceBinding, instrumentKV, bindingCaptureKeys) — attempts: 0 — review: opus
+- [x] 002 Binding core + KV — done; trace-binding.ts (span+histogram, orphan guard, explicit buckets), config.ts (ensureSDK hook), kv.ts proxy; 18 tests incl continuity/orphan/redaction/buckets; opus-reviewed — attempts: 0 — review: opus
 - [ ] 003 D1 (+ prepared-statement wrapping) — attempts: 0 — review: opus
 - [ ] 004 R2 (method-latency span, no body drain) — attempts: 0 — review: sonnet
 - [ ] 005 Queue producer — attempts: 0 — review: sonnet

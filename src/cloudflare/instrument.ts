@@ -17,6 +17,7 @@ import { getLogger } from "../shared/logger.js";
 import { noopSDKResult } from "../shared/noop.js";
 import type { LogAttributes, Logger, SDKConfig, SDKResult } from "../shared/types.js";
 import { cloudflareWorkerAdapter } from "./adapter.js";
+import { setBindingConfig } from "./bindings/config.js";
 
 // Minimal CF types to avoid @cloudflare/workers-types dependency
 export interface ExecutionContext {
@@ -158,6 +159,7 @@ export function ensureSDK(config: Omit<SDKConfig, "runtime">): SDKResult {
 		} catch {
 			sdkResult = noopSDKResult();
 		}
+		setBindingConfig(config);
 	}
 	return sdkResult;
 }

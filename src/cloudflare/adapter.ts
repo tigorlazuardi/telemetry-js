@@ -55,6 +55,8 @@ import { createLogger, getLogger, setDefaultLogger, setLoggerStorage } from "../
 import { noopSDKResult } from "../shared/noop.js";
 import { buildResource } from "../shared/resource.js";
 import type { RuntimeAdapter, SDKConfig, SDKResult } from "../shared/types.js";
+import { createRecordAllHeadSampler } from "./sampling.js";
+import { TailSampleSpanProcessor } from "./tail-processor.js";
 
 /**
  * Lightweight {@link ContextManager} backed by {@link AsyncLocalStorage}.
@@ -129,6 +131,7 @@ export const cloudflareWorkerAdapter: RuntimeAdapter = {
 
 			// Trace provider (only if endpoint resolves)
 			let provider: BasicTracerProvider | undefined;
+			let tailProcessor: TailSampleSpanProcessor | undefined;
 			if (tracesEndpoint) {
 				const traceExporter = new FetchTraceExporter({
 					url: tracesEndpoint,
@@ -136,10 +139,25 @@ export const cloudflareWorkerAdapter: RuntimeAdapter = {
 					fetchFn: getOriginalFetch,
 				});
 
-				provider = new BasicTracerProvider({
-					resource,
-					spanProcessors: [new SimpleSpanProcessor(traceExporter)],
-				});
+				if (config.sampling) {
+					const headSampler =
+						config.sampling.headSampler ??
+						createRecordAllHeadSampler(config.sampling.propagationRatio ?? 1.0);
+					tailProcessor = new TailSampleSpanProcessor(traceExporter, {
+						tailSampler: config.sampling.tailSampler,
+						maxBufferedSpans: config.sampling.maxBufferedSpans,
+					});
+					provider = new BasicTracerProvider({
+						resource,
+						sampler: headSampler,
+						spanProcessors: [tailProcessor],
+					});
+				} else {
+					provider = new BasicTracerProvider({
+						resource,
+						spanProcessors: [new SimpleSpanProcessor(traceExporter)],
+					});
+				}
 
 				trace.setGlobalTracerProvider(provider as unknown as TracerProvider);
 			}
@@ -200,6 +218,14 @@ export const cloudflareWorkerAdapter: RuntimeAdapter = {
 				meterProvider,
 				loggerProvider,
 				logger,
+				...(tailProcessor !== undefined
+					? {
+							flushTrace(traceId: string): Promise<void> {
+								// tailProcessor.forceFlush already calls exporter.forceFlush internally.
+								return tailProcessor!.forceFlush(traceId);
+							},
+						}
+					: {}),
 				async shutdown() {
 					try {
 						await provider?.shutdown();

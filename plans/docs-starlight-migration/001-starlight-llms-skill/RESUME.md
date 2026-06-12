@@ -20,7 +20,7 @@
 - [x] 006 runtimes/bun.md — attempts: 0
 - [x] 007 runtimes/cloudflare.md — attempts: 0
 - [x] 008 runtimes/browser.md — attempts: 0
-- [ ] 009 guides/*.md (11) — attempts: 0
+- [x] 009 guides/*.md (12 created) — attempts: 0
 - [ ] 010 landing index.mdx + CopyLlmsUrl.astro — attempts: 0
 - [ ] 011 verify llms output (emit + whitespace) — attempts: 0
 - [ ] 012 trim README — attempts: 0
@@ -34,6 +34,7 @@
 - 003: docs/astro.config.mjs
 - 004: docs/src/content/docs/getting-started/{installation,subpath-exports,concepts}.md; docs/src/content.config.ts (docsLoader fix); docs/scripts/gen-api.mjs (title frontmatter injection)
 - 005-008: docs/src/content/docs/runtimes/{node,bun,cloudflare,browser}.md
+- 009: docs/src/content/docs/guides/{with-trace,trace-handler,context,database-naming,endpoint-resolution,logger,metrics,ui-action-metrics,exporters,configuration,resource-validation,instrument-fetch}.md
 
 ## Key decisions made during execution
 - 003: Starlight v0.39.0 breaking change — `{ label, autogenerate }` sidebar groups removed. New syntax: `{ label, items: [{ autogenerate: { directory } }] }`. Collapsed: true moves to group level.

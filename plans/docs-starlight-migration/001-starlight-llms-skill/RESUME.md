@@ -25,7 +25,7 @@
 - [x] 011 verify llms output (emit + whitespace) — attempts: 0
 - [x] 012 trim README — attempts: 0
 - [x] 013 generator skill + package.json files — attempts: 1  (review: opus — ISSUES FOUND + fixed: SDKResult.ok/.value hallucination, withTrace(name,fn) wrong sig, traceHandler positional arg)
-- [ ] 014 reconcile root package.json + drop HTML typedoc — attempts: 0  (review: opus)
+- [x] 014 reconcile root package.json + drop HTML typedoc — attempts: 0  (review: opus — APPROVED)
 - [ ] 015 CI docs build + Pages deploy — attempts: 0
 
 ## Files touched (append as tasks complete)
@@ -39,6 +39,7 @@
 - 011: verified llms.txt + llms-full.txt emitted (18 + 19751 lines), 5 custom sets in _llms-txt/, whitespace:false confirmed
 - 012: README.md trimmed to 65 lines (was 734); docs site + llms.txt links present
 - 013: skills/telemetry-js/SKILL.md (generator skill, Opus-reviewed + fixed); package.json files += "skills"
+- 014: package.json docs:generate → pnpm --filter docs build; typedoc.json out → docs-html-legacy; .gitignore += docs-html-legacy/. Opus APPROVED.
 
 ## Key decisions made during execution
 - 003: Starlight v0.39.0 breaking change — `{ label, autogenerate }` sidebar groups removed. New syntax: `{ label, items: [{ autogenerate: { directory } }] }`. Collapsed: true moves to group level.

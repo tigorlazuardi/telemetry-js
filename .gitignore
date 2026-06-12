@@ -3,3 +3,4 @@ dist/
 docs/dist/
 docs/.astro/
 docs/src/content/docs/api/
+docs-html-legacy/

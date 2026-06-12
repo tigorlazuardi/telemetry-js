@@ -13,7 +13,7 @@
 		"./src/context/index.ts",
 		"./src/vite/index.ts"
 	],
-	"out": "docs",
+	"out": "docs-html-legacy",
 	"excludePrivate": true,
 	"excludeInternal": true,
 	"readme": "README.md",

@@ -203,7 +203,7 @@ describe("createRecordAllHeadSampler", () => {
 	it("ratio 1.0 → RECORD_AND_SAMPLED even for traceId that accumulates to 0xffffffff", () => {
 		// "ffffffff" + zeros accumulates to 0xffffffff which would fail `< 0xffffffff` without the saturated short-circuit
 		const sampler = createRecordAllHeadSampler(1.0);
-		const edgeId = "ffffffff" + "0".repeat(24);
+		const edgeId = `ffffffff${"0".repeat(24)}`;
 		const result = sampler.shouldSample(ROOT_CONTEXT, edgeId, "test", 0, {}, []);
 		expect(result.decision).toBe(SamplingDecision.RECORD_AND_SAMPLED);
 	});

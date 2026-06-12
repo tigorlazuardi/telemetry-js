@@ -2,7 +2,7 @@ import type { Context } from "@opentelemetry/api";
 import { SpanKind, SpanStatusCode, TraceFlags } from "@opentelemetry/api";
 import { ExportResultCode } from "@opentelemetry/core";
 import type { ReadableSpan, Span as SdkSpan } from "@opentelemetry/sdk-trace-base";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { keepAll, keepOnError } from "../src/cloudflare/sampling.js";
 import { TailSampleSpanProcessor } from "../src/cloudflare/tail-processor.js";
 

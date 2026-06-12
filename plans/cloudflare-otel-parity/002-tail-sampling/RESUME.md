@@ -1,7 +1,7 @@
 # RESUME — Cloudflare Tail Sampling
 
 **Slice:** plans/cloudflare-otel-parity/002-tail-sampling/
-**Status:** in progress
+**Status:** done
 **Base branch:** main
 **Branch (when running):** ralph/cloudflare-otel-parity-002
 **Design spec:** docs/superpowers/specs/2026-06-12-cloudflare-otel-parity-design.md (Feature C)
@@ -9,15 +9,15 @@
 
 ## Ralph state
 - Contract: CONTRACT.md (this slice)
-- Loop status: active | blocked | done  → **not started**
+- Loop status: active | blocked | done  → **done**
 
 ## Task progress (with attempt counters)
 - [x] 001 Sampling types + built-in tail samplers + SDKConfig.sampling — attempts: 0 — review: opus — commit: 05df487
 - [x] 002 TailSampleSpanProcessor (buffer/decide/flush, memory cap) — attempts: 0 — review: opus — commit: 569df6e
 - [x] 003 Record-all + ratio-propagate head sampler (ParentBased) — attempts: 0 — review: opus — commit: fe7c1db
-- [ ] 004 Adapter wiring (tail processor only when sampling set; waitUntil flush) — attempts: 0 — review: opus
-- [ ] 005 Docs: tail-sampling guide + TSDoc — attempts: 0 — review: self
-- [ ] 006 Final full gate — attempts: 0 — review: sonnet
+- [x] 004 Adapter wiring (tail processor only when sampling set; waitUntil flush) — attempts: 0 — review: opus — commit: 66667a8
+- [x] 005 Docs: tail-sampling guide + TSDoc — attempts: 0 — review: self — commit: 56bc007
+- [x] 006 Final full gate — attempts: 0 — review: sonnet — all §2 commands exit 0
 
 ## Files touched
 - `src/cloudflare/sampling.ts` (new — built-in samplers)

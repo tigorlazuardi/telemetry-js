@@ -1,4 +1,4 @@
-name: Deploy API Docs
+name: Deploy Docs
 
 on:
   push:
@@ -28,11 +28,13 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm run docs:generate
+      - name: Build docs
+        run: pnpm --filter docs build
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          path: docs
+          path: docs/dist
 
   deploy:
     needs: build

@@ -215,15 +215,21 @@ describe("createLogger", () => {
 				`${ANSI.green}[INFO]${ANSI.reset} ${ANSI.dim}[1970-01-01T00:00:00.000Z]${ANSI.reset} ${ANSI.cyan}[test-service]${ANSI.reset} first log\n${JSON.stringify({ details: { ok: true } }, null, 2)}\n\n`,
 			);
 
-			await new Promise((resolve) => setTimeout(resolve, 0));
+			const expectedColored = `${ANSI.green}[INFO]${ANSI.reset} ${ANSI.dim}[1970-01-01T00:00:00.001Z]${ANSI.reset} ${ANSI.cyan}[test-service]${ANSI.reset} second log\n<<colored>>\n${JSON.stringify({ details: { ok: true } }, null, 2)}\n<</colored>>\n\n`;
 
-			withTTY(true, () => {
-				const logger = createReloadedLogger("test-service");
-				logger.info("second log", { details: { ok: true } }, { timestamp: 1 });
-			});
-
-			expect(stderrSpy.mock.calls.at(-1)?.[0]).toBe(
-				`${ANSI.green}[INFO]${ANSI.reset} ${ANSI.dim}[1970-01-01T00:00:00.001Z]${ANSI.reset} ${ANSI.cyan}[test-service]${ANSI.reset} second log\n<<colored>>\n${JSON.stringify({ details: { ok: true } }, null, 2)}\n<</colored>>\n\n`,
+			// The highlighter loads via dynamic import (/* @vite-ignore */) which
+			// bypasses Vitest's mock system and uses Node's native loader — resolution
+			// time is non-deterministic. Poll until the second log produces colored
+			// output instead of relying on a fixed delay.
+			await vi.waitFor(
+				() => {
+					withTTY(true, () => {
+						const logger = createReloadedLogger("test-service");
+						logger.info("second log", { details: { ok: true } }, { timestamp: 1 });
+					});
+					expect(stderrSpy.mock.calls.at(-1)?.[0]).toBe(expectedColored);
+				},
+				{ timeout: 2000, interval: 10 },
 			);
 		});
 

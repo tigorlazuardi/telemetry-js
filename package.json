@@ -52,7 +52,8 @@
 	},
 	"files": [
 		"dist",
-		"README.md"
+		"README.md",
+		"skills"
 	],
 	"repository": {
 		"type": "git",
@@ -67,7 +68,7 @@
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
 		"size": "size-limit",
-		"docs:generate": "typedoc",
+		"docs:generate": "pnpm --filter docs build",
 		"prepare": "husky"
 	},
 	"packageManager": "pnpm@10.30.0",

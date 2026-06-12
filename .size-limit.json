@@ -1,15 +1,18 @@
 [
 	{
 		"name": "/browser",
-		"path": "dist/browser/index.js"
+		"path": "dist/browser/index.js",
+		"limit": "33 kB"
 	},
 	{
 		"name": "/browser/fetch",
-		"path": "dist/browser/fetch/index.js"
+		"path": "dist/browser/fetch/index.js",
+		"limit": "5 kB"
 	},
 	{
 		"name": "/browser/react",
-		"path": "dist/browser/react/index.js"
+		"path": "dist/browser/react/index.js",
+		"limit": "7 kB"
 	},
 	{
 		"name": "/browser/sdk",

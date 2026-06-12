@@ -16,8 +16,12 @@ imports `browserAdapter` (full OTel SDK in eager chunk). Design approved: `DESIG
 - Baseline `/browser` (full SDK, brotli): 30.17 kB
 - Baseline `/browser/fetch` (brotli): 4.31 kB
 - Baseline `/browser/react` (brotli): 5.73 kB
-- After `/browser` facade (brotli): _TBD — task 009_
-- Delta: _TBD_
+- After `/browser` facade (brotli, esbuild total incl. lazy chunk): 31.89 kB
+- After `/browser/fetch` (brotli): 4.31 kB (unchanged)
+- After `/browser/react` (brotli): 5.73 kB (unchanged)
+- After `/browser/sdk` (brotli, new heavy subpath): 25.36 kB
+- Delta /browser: +1.72 kB vs baseline (size-limit includes lazy chunk — esbuild bundles dynamic imports; eager-only chunk is much smaller, ~2 kB)
+- Note: size-limit measures total bundle (eager + lazy). Zero-OTel in eager chunk verified by `! grep "@opentelemetry" dist/browser/index.js` (§2 check, not size-limit).
 
 ## Task progress (with attempt counters)
 - [x] 001 size-limit tooling + baseline — attempts: 0
@@ -28,7 +32,7 @@ imports `browserAdapter` (full OTel SDK in eager chunk). Design approved: `DESIG
 - [x] 006 rewrite index.ts as facade (async initSDK) — attempts: 0
 - [x] 007 sdk.ts subpath + package exports — attempts: 0
 - [x] 008 tests — attempts: 0
-- [ ] 009 size budgets + after numbers — attempts: 0
+- [x] 009 size budgets + after numbers — attempts: 0
 - [ ] 010 docs + CI size job — attempts: 0
 
 ## Open questions

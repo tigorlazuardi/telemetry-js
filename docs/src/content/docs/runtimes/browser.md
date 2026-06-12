@@ -110,8 +110,8 @@ Before `initSDK` resolves, the OTel API returns a noop tracer — `fetch` works 
 import { useScopeAction } from "@tigorhutasuhut/telemetry-js/browser/react";
 
 function LoginForm() {
-  // Pre-fills ui.page (from the router) and ui.component ("LoginForm")
-  const action = useScopeAction("LoginForm");
+  // Pre-fills ui.page and ui.component on every action
+  const action = useScopeAction({ page: "/auth/login", component: "LoginForm" });
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

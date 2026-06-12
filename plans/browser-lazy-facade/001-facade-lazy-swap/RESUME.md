@@ -27,7 +27,7 @@ imports `browserAdapter` (full OTel SDK in eager chunk). Design approved: `DESIG
 - [x] 005 internal/real.ts lazy chunk root — attempts: 0
 - [x] 006 rewrite index.ts as facade (async initSDK) — attempts: 0
 - [x] 007 sdk.ts subpath + package exports — attempts: 0
-- [ ] 008 tests — attempts: 0
+- [x] 008 tests — attempts: 0
 - [ ] 009 size budgets + after numbers — attempts: 0
 - [ ] 010 docs + CI size job — attempts: 0
 

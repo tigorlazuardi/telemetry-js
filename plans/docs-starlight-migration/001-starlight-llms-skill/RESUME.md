@@ -24,7 +24,7 @@
 - [x] 010 landing index.mdx + CopyLlmsUrl.astro — attempts: 0
 - [x] 011 verify llms output (emit + whitespace) — attempts: 0
 - [x] 012 trim README — attempts: 0
-- [ ] 013 generator skill + package.json files — attempts: 0  (review: opus)
+- [x] 013 generator skill + package.json files — attempts: 1  (review: opus — ISSUES FOUND + fixed: SDKResult.ok/.value hallucination, withTrace(name,fn) wrong sig, traceHandler positional arg)
 - [ ] 014 reconcile root package.json + drop HTML typedoc — attempts: 0  (review: opus)
 - [ ] 015 CI docs build + Pages deploy — attempts: 0
 
@@ -38,6 +38,7 @@
 - 010: docs/src/content/docs/index.mdx (splash + CopyLlmsUrl), docs/src/components/CopyLlmsUrl.astro
 - 011: verified llms.txt + llms-full.txt emitted (18 + 19751 lines), 5 custom sets in _llms-txt/, whitespace:false confirmed
 - 012: README.md trimmed to 65 lines (was 734); docs site + llms.txt links present
+- 013: skills/telemetry-js/SKILL.md (generator skill, Opus-reviewed + fixed); package.json files += "skills"
 
 ## Key decisions made during execution
 - 003: Starlight v0.39.0 breaking change — `{ label, autogenerate }` sidebar groups removed. New syntax: `{ label, items: [{ autogenerate: { directory } }] }`. Collapsed: true moves to group level.

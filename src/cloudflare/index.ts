@@ -116,6 +116,7 @@ export type {
 	D1ExecResult,
 	D1PreparedStatement,
 	D1Result,
+	DurableObjectStorage,
 	KVGetOptions,
 	KVListOptions,
 	KVListResult,
@@ -132,6 +133,7 @@ export type {
 } from "./bindings/index.js";
 export {
 	instrumentD1,
+	instrumentDOStorage,
 	instrumentKV,
 	instrumentQueue,
 	instrumentR2,

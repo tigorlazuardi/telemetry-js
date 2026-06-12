@@ -6,6 +6,7 @@
  */
 
 export { instrumentD1 } from "./d1.js";
+export { instrumentDOStorage } from "./do-storage.js";
 export { instrumentKV } from "./kv.js";
 export { instrumentQueue } from "./queue.js";
 export { instrumentR2 } from "./r2.js";
@@ -16,6 +17,7 @@ export type {
 	D1ExecResult,
 	D1PreparedStatement,
 	D1Result,
+	DurableObjectStorage,
 	KVGetOptions,
 	KVListOptions,
 	KVListResult,

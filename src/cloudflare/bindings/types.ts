@@ -182,6 +182,30 @@ export interface Queue<Body = unknown> {
 	sendBatch(messages: Iterable<MessageSendRequest<Body>>, options?: unknown): Promise<void>;
 }
 
+// ── DurableObject Storage types ───────────────────────────────────────────────
+
+/**
+ * Minimal `DurableObjectStorage` interface covering the methods wrapped by
+ * {@link instrumentDOStorage}.
+ *
+ * Only the async data methods are declared here. Alarm, transaction, and sync
+ * methods exist on the real runtime object but are OUT OF SCOPE — they pass
+ * through untraced via the Proxy.
+ *
+ * Consumers may pass a real `DurableObjectStorage` (from `@cloudflare/workers-types`) —
+ * structural typing ensures compatibility.
+ */
+export interface DurableObjectStorage {
+	get<T = unknown>(key: string, opts?: unknown): Promise<T | undefined>;
+	get<T = unknown>(keys: string[], opts?: unknown): Promise<Map<string, T>>;
+	put<T = unknown>(key: string, value: T, opts?: unknown): Promise<void>;
+	put<T = unknown>(entries: Record<string, T>, opts?: unknown): Promise<void>;
+	delete(key: string, opts?: unknown): Promise<boolean>;
+	delete(keys: string[], opts?: unknown): Promise<number>;
+	list<T = unknown>(opts?: unknown): Promise<Map<string, T>>;
+	deleteAll(opts?: unknown): Promise<void>;
+}
+
 // ── KV types ──────────────────────────────────────────────────────────────────
 
 /**

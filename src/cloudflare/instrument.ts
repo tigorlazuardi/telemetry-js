@@ -544,7 +544,12 @@ export async function traceHandler<T = Response>(opts: TraceHandlerOptions<T>): 
 
 		ctx?.waitUntil(
 			(async () => {
-				await sdkResult?.forceFlush();
+				const traceId = span?.spanContext().traceId;
+				if (traceId && sdkResult?.flushTrace) {
+					await sdkResult.flushTrace(traceId);
+				} else {
+					await sdkResult?.forceFlush();
+				}
 				const result = opts.onFlush?.();
 				if (
 					result != null &&

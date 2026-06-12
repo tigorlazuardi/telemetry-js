@@ -263,4 +263,13 @@ export interface SDKResult {
 
 	/** Force-flush all pending spans, metrics, and logs without shutting down. */
 	forceFlush(): Promise<void>;
+
+	/**
+	 * Flush spans for a specific trace by ID (Cloudflare tail-sampling only).
+	 *
+	 * Called from `ctx.waitUntil` with the current request's root trace ID so that
+	 * the tail decision runs for exactly that trace. Falls back to `forceFlush()`
+	 * when tail-sampling is not configured.
+	 */
+	flushTrace?(traceId: string): Promise<void>;
 }

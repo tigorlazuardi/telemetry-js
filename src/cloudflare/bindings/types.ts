@@ -88,6 +88,74 @@ export interface D1Database {
 	dump(): Promise<ArrayBuffer>;
 }
 
+// ── R2 types ──────────────────────────────────────────────────────────────────
+
+/**
+ * Minimal R2 object metadata interface (no body).
+ * Structural alias for `R2Object` from `@cloudflare/workers-types`.
+ */
+export interface R2Object {
+	key: string;
+	version: string;
+	size: number;
+	etag: string;
+	httpEtag: string;
+	uploaded: Date;
+	checksums: unknown;
+	httpMetadata?: unknown;
+	customMetadata?: Record<string, string>;
+	range?: unknown;
+	writeHttpMetadata?: (headers: Headers) => void;
+}
+
+/**
+ * Minimal R2 object body interface — extends R2Object with a readable stream.
+ *
+ * The `body` stream MUST NOT be consumed by the instrumentation layer; it is
+ * returned untouched to the caller so streaming semantics are preserved.
+ */
+export interface R2ObjectBody extends R2Object {
+	body: ReadableStream;
+	bodyUsed: boolean;
+	arrayBuffer(): Promise<ArrayBuffer>;
+	text(): Promise<string>;
+	json<T = unknown>(): Promise<T>;
+	blob(): Promise<Blob>;
+}
+
+/** Result of `R2Bucket.list`. */
+export interface R2Objects {
+	objects: R2Object[];
+	truncated: boolean;
+	cursor?: string;
+	delimitedPrefixes: string[];
+}
+
+/** Minimal multipart upload handle — only used synchronously; no tracing needed. */
+export interface R2MultipartUpload {
+	key: string;
+	uploadId: string;
+	uploadPart(partNumber: number, value: unknown): Promise<unknown>;
+	abort(): Promise<void>;
+	complete(uploadedParts: unknown[]): Promise<R2Object>;
+}
+
+/**
+ * Minimal `R2Bucket` interface covering the methods wrapped by {@link instrumentR2}.
+ *
+ * Consumers may pass a real `R2Bucket` (from `@cloudflare/workers-types`) —
+ * structural typing ensures compatibility.
+ */
+export interface R2Bucket {
+	get(key: string, options?: unknown): Promise<R2ObjectBody | null>;
+	put(key: string, value: unknown, options?: unknown): Promise<R2Object>;
+	head(key: string): Promise<R2Object | null>;
+	delete(keys: string | string[]): Promise<void>;
+	list(options?: unknown): Promise<R2Objects>;
+	createMultipartUpload(key: string, options?: unknown): Promise<R2MultipartUpload>;
+	resumeMultipartUpload(key: string, uploadId: string): R2MultipartUpload;
+}
+
 // ── KV types ──────────────────────────────────────────────────────────────────
 
 /**

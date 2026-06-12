@@ -13,7 +13,7 @@
 
 ## Task progress (with attempt counters)
 - [x] 001 Scaffold docs/ workspace — attempts: 0
-- [ ] 002 TypeDoc prebuild pipeline (per-runtime buckets) — attempts: 0
+- [x] 002 TypeDoc prebuild pipeline (per-runtime buckets) — attempts: 0
 - [ ] 003 astro.config.mjs (starlight + llms-txt, whitespace:false, 5 sets) — attempts: 0
 - [ ] 004 getting-started/ pages — attempts: 0
 - [ ] 005 runtimes/node.md — attempts: 0
@@ -30,6 +30,7 @@
 
 ## Files touched (append as tasks complete)
 - 001: docs/package.json, docs/tsconfig.json, docs/src/content.config.ts, docs/src/content/docs/index.mdx, pnpm-workspace.yaml, .gitignore
+- 002: docs/typedoc.base.json, docs/scripts/gen-api.mjs
 
 ## Key decisions made during execution
 - (none yet)

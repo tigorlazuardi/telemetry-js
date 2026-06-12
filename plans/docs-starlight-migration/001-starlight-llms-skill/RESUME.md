@@ -12,7 +12,7 @@
 - Completion promise: `ALL ACCEPTANCE MET`
 
 ## Task progress (with attempt counters)
-- [ ] 001 Scaffold docs/ workspace — attempts: 0
+- [x] 001 Scaffold docs/ workspace — attempts: 0
 - [ ] 002 TypeDoc prebuild pipeline (per-runtime buckets) — attempts: 0
 - [ ] 003 astro.config.mjs (starlight + llms-txt, whitespace:false, 5 sets) — attempts: 0
 - [ ] 004 getting-started/ pages — attempts: 0
@@ -29,7 +29,7 @@
 - [ ] 015 CI docs build + Pages deploy — attempts: 0
 
 ## Files touched (append as tasks complete)
-- (none yet)
+- 001: docs/package.json, docs/tsconfig.json, docs/src/content.config.ts, docs/src/content/docs/index.mdx, pnpm-workspace.yaml, .gitignore
 
 ## Key decisions made during execution
 - (none yet)

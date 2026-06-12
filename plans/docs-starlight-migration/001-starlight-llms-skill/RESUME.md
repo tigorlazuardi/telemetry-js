@@ -1,8 +1,8 @@
 # RESUME — docs-starlight-migration / 001-starlight-llms-skill
 
 ## Status
-- Slice status: `active`
-- Loop status: `active`
+- Slice status: `completed`
+- Loop status: `completed`
 - Contract: CONTRACT.md (this slice)
 - Base branch: main
 - Branch (loop): ralph/docs-starlight-migration-001

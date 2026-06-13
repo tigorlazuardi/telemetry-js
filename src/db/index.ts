@@ -24,6 +24,14 @@ const QUERY_NAME_KEY = createContextKey("telemetry-js:query-name");
  * Read the current query name from the active OTel context.
  *
  * Returns `undefined` when called outside a {@link withQueryName} scope.
+ *
+ * @example
+ * ```ts
+ * import { getQueryName } from "@tigorhutasuhut/telemetry-js/db";
+ *
+ * // Inside your db driver wrapper:
+ * const name = getQueryName(); // "getUser" (set by withQueryName)
+ * ```
  */
 export function getQueryName(): string | undefined {
 	return context.active().getValue(QUERY_NAME_KEY) as string | undefined;
@@ -37,6 +45,13 @@ export function getQueryName(): string | undefined {
  * @param name  - Logical query name (e.g. `"getUser"`, `"listOrders"`).
  * @param fn    - The function to execute within the named context.
  * @returns Whatever `fn` returns (or a `Promise` thereof).
+ *
+ * @example
+ * ```ts
+ * import { withQueryName } from "@tigorhutasuhut/telemetry-js/db";
+ *
+ * const user = await withQueryName("getUser", () => db.query("SELECT * FROM users WHERE id = ?", [id]));
+ * ```
  */
 export function withQueryName<T>(name: string, fn: () => T): T {
 	const tracer = trace.getTracer("@tigorhutasuhut/telemetry-js/db");

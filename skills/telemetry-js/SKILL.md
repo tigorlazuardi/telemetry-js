@@ -77,6 +77,10 @@ paths: ["**/*.ts", "**/*.tsx"]
 - `instrument` and `traceHandler` handle lifecycle automatically; no manual shutdown needed
 - `initSDK(config)` returns `SDKResult` directly — it never throws (returns a noop result on failure). Use it directly: `const sdk = initSDK({ ... })`
 - `withTrace(fn, opts?)` is available from `@tigorhutasuhut/telemetry-js/cloudflare` — first arg is the callback, span name auto-detected from function name
+- Wrap Cloudflare bindings to auto-trace I/O (CLIENT spans + duration/error metrics): `instrumentKV(kv, name)`, `instrumentD1(db, name)`, `instrumentR2(bucket, name)`, `instrumentDOStorage(storage, name)`, `instrumentQueue(queue, name)` — all from `/cloudflare`; each returns the same binding type; `name` is the span/metric label
+- `@instrumentWorkflow({ serviceName })` — class decorator on a `WorkflowEntrypoint` subclass
+- `traceBinding({ bindingType, bindingName, operation }, fn)` — manual span for a custom/unsupported binding op
+- `bindingCaptureKeys` defaults to `false` — KV/R2/DO keys are NOT captured as span attrs (PII); opt in via `SDKConfig` only when safe
 - Use `@tigorhutasuhut/telemetry-js/context` for context propagation helpers
 - Use `@tigorhutasuhut/telemetry-js/error` for error recording helpers
 - Use `@tigorhutasuhut/telemetry-js/db` for database span helpers
@@ -164,7 +168,7 @@ https://tigorlazuardi.github.io/telemetry-js/llms.txt
 ```markdown
 ---
 name: telemetry-js-usage
-description: telemetry-js usage guidance for Cloudflare Workers — instrument(), traceHandler(), no Node.js http.
+description: telemetry-js usage guidance for Cloudflare Workers — instrument(), traceHandler(), binding instrumentation, no Node.js http.
 ---
 
 # telemetry-js usage — Cloudflare Workers
@@ -176,6 +180,14 @@ Key APIs:
 - `traceHandler({ serviceName, request, context, env, handler, onFlush? })` — trace individual fetch handlers; use in SvelteKit/Remix/Pages where you have `Request` + `ExecutionContext` but not the full `ExportedHandler` pattern
 - `withTrace(fn, opts?)` — wrap a function in a child span; span name auto-detected from function name; note: reports 0 ms for pure CPU work (no I/O) due to Spectre mitigation
 - `initSDK(config)` — initialize once per isolate, not per request; returns `SDKResult` (never throws); use a module-level singleton (`ensureTelemetry()` pattern)
+- `instrumentKV(kv, name)` — wrap a KV binding; returns same type; auto-emits CLIENT spans + duration histogram
+- `instrumentD1(db, name)` — wrap a D1 database binding; returns same type
+- `instrumentR2(bucket, name)` — wrap an R2 bucket binding; returns same type
+- `instrumentDOStorage(storage, name)` — wrap Durable Object `state.storage`; returns same type
+- `instrumentQueue(queue, name)` — wrap a Queue producer binding; returns same type
+- `@instrumentWorkflow({ serviceName })` — class decorator on a `WorkflowEntrypoint` subclass
+- `traceBinding({ bindingType, bindingName, operation, attributes?, key? }, fn)` — manual span for a custom/unsupported binding op
+- `bindingCaptureKeys` in `SDKConfig` — defaults to `false`; KV/R2/DO keys are NOT captured as span attrs (PII); opt in only when safe
 - Never use Node.js `http`/`https` in Workers
 - Spans flush via `ctx.waitUntil` — never block the response
 - W3C Trace Context (`traceparent`/`tracestate`) extracted from incoming headers and injected into response headers automatically
@@ -384,6 +396,100 @@ const data = withTrace(
 ```
 
 **Workers caveat:** `performance.now()` only advances after I/O (Spectre mitigation). `withTrace` on pure CPU work will report 0 ms duration. Use it for operations that involve at least one I/O call.
+
+## Binding instrumentation
+
+Wrap Cloudflare bindings to auto-emit CLIENT spans and a `cloudflare.binding.operation.duration` histogram for every operation. All five wrappers import from `@tigorhutasuhut/telemetry-js/cloudflare`, accept `(binding, name)`, and return the **same binding type** — drop-in transparent proxies.
+
+```ts
+import {
+  instrument,
+  instrumentKV,
+  instrumentD1,
+  instrumentR2,
+  instrumentQueue,
+  instrumentDOStorage,
+} from "@tigorhutasuhut/telemetry-js/cloudflare";
+
+export default instrument(
+  {
+    async fetch(request, env, ctx) {
+      const kv     = instrumentKV(env.SESSIONS, "SESSIONS");
+      const db     = instrumentD1(env.DB, "DB");
+      const bucket = instrumentR2(env.ASSETS, "ASSETS");
+      const queue  = instrumentQueue(env.JOBS, "JOBS");
+
+      const session = await kv.get("session:abc");    // span: "KV SESSIONS get"
+      const user    = await db.prepare("SELECT * FROM users WHERE id = ?").bind(session).first();
+                                                      // span: "D1 DB SELECT"
+      const asset   = await bucket.get("logo.png");   // span: "R2 ASSETS get"
+      await queue.send({ type: "email" });             // span: "QUEUE JOBS send"
+
+      return Response.json(user);
+    },
+  },
+  (env) => ({ serviceName: "my-worker", exporterEndpoint: env.OTEL_ENDPOINT }),
+);
+```
+
+Wrap `state.storage` inside a Durable Object constructor:
+
+```ts
+import { instrumentDOStorage } from "@tigorhutasuhut/telemetry-js/cloudflare";
+
+export class MyDO implements DurableObject {
+  private storage: DurableObjectStorage;
+
+  constructor(private state: DurableObjectState, private env: Env) {
+    this.storage = instrumentDOStorage(state.storage, "MyDO");
+  }
+
+  async fetch(request: Request) {
+    await this.storage.put("last-seen", Date.now()); // span: "DO MyDO put"
+    return new Response("ok");
+  }
+}
+```
+
+### `@instrumentWorkflow` — Workflow decorator
+
+```ts
+import { instrumentWorkflow } from "@tigorhutasuhut/telemetry-js/cloudflare";
+
+@instrumentWorkflow({ serviceName: "my-worker" })
+export class MyWorkflow extends WorkflowEntrypoint<Env, Params> {
+  async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
+    // steps are automatically traced
+  }
+}
+```
+
+### `traceBinding` — manual span for custom/unsupported binding ops
+
+```ts
+import { traceBinding } from "@tigorhutasuhut/telemetry-js/cloudflare";
+
+const result = await traceBinding(
+  {
+    bindingType: "my-custom-binding",
+    bindingName: "MY_BINDING",
+    operation: "process",
+    attributes: { "custom.param": "value" },
+  },
+  () => env.MY_BINDING.process(payload),
+);
+```
+
+### `bindingCaptureKeys` — PII opt-in
+
+KV keys, R2 object keys, and DO storage keys are **omitted from span attributes by default** — they may contain PII. Opt in only when safe:
+
+```ts
+instrument(handler, {
+  serviceName: "my-worker",
+  bindingCaptureKeys: true, // adds *.key attrs to spans — review PII implications first
+});
+```
 
 ## SvelteKit on Cloudflare Pages — full setup
 

@@ -91,6 +91,18 @@ export function createOneOffAction(): AsyncAction {
  * code (non-blocking during render). The returned callback awaits that lazy
  * load on first use, so an action triggered before the module is ready simply
  * resolves once it arrives.
+ *
+ * @example
+ * ```tsx
+ * import { useScopeAction } from "@tigorhutasuhut/telemetry-js/browser/react";
+ *
+ * function SignInForm() {
+ *   const action = useScopeAction({ page: "/auth/sign-in", component: "SignInForm" });
+ *   const handleSubmit = async () => {
+ *     await action("submit", () => authClient.signIn.email({ email, password }));
+ *   };
+ * }
+ * ```
  */
 export function useScopeAction(scope: ActionScope): AsyncScopedAction {
 	// Kick the lazy load during render — non-blocking, idempotent.
@@ -99,7 +111,21 @@ export function useScopeAction(scope: ActionScope): AsyncScopedAction {
 	return useMemo(() => createScopedAction({ page, component }), [page, component]);
 }
 
-/** React hook: a one-off UI-action runner (lazy, like {@link useScopeAction}). */
+/**
+ * React hook: a one-off UI-action runner (lazy, like {@link useScopeAction}).
+ *
+ * @example
+ * ```tsx
+ * import { useAction } from "@tigorhutasuhut/telemetry-js/browser/react";
+ *
+ * function LogoutButton() {
+ *   const run = useAction();
+ *   const handleClick = async () => {
+ *     await run("logout", () => authClient.signOut(), { page: "/settings" });
+ *   };
+ * }
+ * ```
+ */
 export function useAction(): AsyncAction {
 	ensureActionModule();
 	return useMemo(() => createOneOffAction(), []);

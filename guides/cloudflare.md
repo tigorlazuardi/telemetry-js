@@ -22,7 +22,7 @@ Wraps a full Cloudflare Worker `ExportedHandler`. Supports `fetch`, `scheduled`,
 
 ```ts
 // src/index.ts (Cloudflare Worker)
-import { instrument } from "@tigorhutasuhut/telemetry-js";
+import { instrument } from "@tigorhutasuhut/telemetry-js/cloudflare";
 
 export default instrument({
   serviceName: "my-worker",
@@ -112,7 +112,7 @@ Create a one-time SDK init helper. This should run once per isolate — not on e
 
 ```ts
 // src/lib/server/telemetry.ts
-import { initSDK, type SDKResult } from "@tigorhutasuhut/telemetry-js";
+import { initSDK, type SDKResult } from "@tigorhutasuhut/telemetry-js/cloudflare";
 
 let sdk: SDKResult | null = null;
 
@@ -133,7 +133,7 @@ export function ensureTelemetry(): SDKResult {
 ```ts
 // src/hooks.server.ts
 import type { Handle } from "@sveltejs/kit";
-import { traceHandler } from "@tigorhutasuhut/telemetry-js";
+import { traceHandler } from "@tigorhutasuhut/telemetry-js/cloudflare";
 import { ensureTelemetry } from "$lib/server/telemetry";
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -171,7 +171,7 @@ If you use `sequence()` from `@sveltejs/kit/hooks`, place telemetry first so eve
 // src/hooks.server.ts
 import { sequence } from "@sveltejs/kit/hooks";
 import type { Handle } from "@sveltejs/kit";
-import { traceHandler } from "@tigorhutasuhut/telemetry-js";
+import { traceHandler } from "@tigorhutasuhut/telemetry-js/cloudflare";
 import { ensureTelemetry } from "$lib/server/telemetry";
 
 const telemetry: Handle = async ({ event, resolve }) => {

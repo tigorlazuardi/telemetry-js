@@ -325,7 +325,7 @@ const headerSetter: TextMapSetter<Headers> = {
  *
  * @example
  * ```ts
- * import { traceHandler } from "@tigorhutasuhut/telemetry-js";
+ * import { traceHandler } from "@tigorhutasuhut/telemetry-js/cloudflare";
  *
  * export async function handle({ event, resolve }) {
  *   return traceHandler({

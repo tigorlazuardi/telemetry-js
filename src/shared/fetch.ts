@@ -27,7 +27,7 @@ let _originalFetch: typeof fetch | null = null;
  *
  * @example
  * ```ts
- * import { getOriginalFetch } from "@tigorhutasuhut/telemetry-js";
+ * import { getOriginalFetch } from "@tigorhutasuhut/telemetry-js/cloudflare";
  *
  * // Always hits the network without creating a span:
  * const res = await getOriginalFetch()("https://collector.example.com/v1/traces", { method: "POST", body });
@@ -147,7 +147,7 @@ async function readLimitedBody(
  *
  * @example
  * ```ts
- * import { instrumentFetch } from "@tigorhutasuhut/telemetry-js";
+ * import { instrumentFetch } from "@tigorhutasuhut/telemetry-js/cloudflare";
  *
  * const tracedFetch = instrumentFetch(globalThis.fetch, { logger });
  * const res = await tracedFetch("https://api.example.com/data");

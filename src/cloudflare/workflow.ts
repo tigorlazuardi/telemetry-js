@@ -158,7 +158,7 @@ async function resolveParentContext(step: WorkflowStep, traceparent?: string): P
  *
  * @example
  * ```ts
- * import { instrumentWorkflow } from "@tigorhutasuhut/telemetry-js";
+ * import { instrumentWorkflow } from "@tigorhutasuhut/telemetry-js/cloudflare";
  *
  * @instrumentWorkflow({ serviceName: "my-workflow" })
  * export class MyWorkflow extends WorkflowEntrypoint {

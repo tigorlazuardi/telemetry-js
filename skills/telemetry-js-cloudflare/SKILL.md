@@ -151,6 +151,100 @@ const data = withTrace(
 
 **Workers caveat:** `performance.now()` only advances after I/O (Spectre mitigation). `withTrace` on pure CPU work will report 0 ms duration. Use it for operations that involve at least one I/O call.
 
+## Binding instrumentation
+
+Wrap Cloudflare bindings to auto-emit CLIENT spans and a `cloudflare.binding.operation.duration` histogram for every operation. All five wrappers import from `@tigorhutasuhut/telemetry-js/cloudflare`, accept `(binding, name)`, and return the **same binding type** — drop-in transparent proxies.
+
+```ts
+import {
+  instrument,
+  instrumentKV,
+  instrumentD1,
+  instrumentR2,
+  instrumentQueue,
+  instrumentDOStorage,
+} from "@tigorhutasuhut/telemetry-js/cloudflare";
+
+export default instrument(
+  {
+    async fetch(request, env, ctx) {
+      const kv     = instrumentKV(env.SESSIONS, "SESSIONS");
+      const db     = instrumentD1(env.DB, "DB");
+      const bucket = instrumentR2(env.ASSETS, "ASSETS");
+      const queue  = instrumentQueue(env.JOBS, "JOBS");
+
+      const session = await kv.get("session:abc");    // span: "KV SESSIONS get"
+      const user    = await db.prepare("SELECT * FROM users WHERE id = ?").bind(session).first();
+                                                      // span: "D1 DB SELECT"
+      const asset   = await bucket.get("logo.png");   // span: "R2 ASSETS get"
+      await queue.send({ type: "email" });             // span: "QUEUE JOBS send"
+
+      return Response.json(user);
+    },
+  },
+  (env) => ({ serviceName: "my-worker", exporterEndpoint: env.OTEL_ENDPOINT }),
+);
+```
+
+Wrap `state.storage` inside a Durable Object constructor:
+
+```ts
+import { instrumentDOStorage } from "@tigorhutasuhut/telemetry-js/cloudflare";
+
+export class MyDO implements DurableObject {
+  private storage: DurableObjectStorage;
+
+  constructor(private state: DurableObjectState, private env: Env) {
+    this.storage = instrumentDOStorage(state.storage, "MyDO");
+  }
+
+  async fetch(request: Request) {
+    await this.storage.put("last-seen", Date.now()); // span: "DO MyDO put"
+    return new Response("ok");
+  }
+}
+```
+
+### `@instrumentWorkflow` — Workflow decorator
+
+```ts
+import { instrumentWorkflow } from "@tigorhutasuhut/telemetry-js/cloudflare";
+
+@instrumentWorkflow({ serviceName: "my-worker" })
+export class MyWorkflow extends WorkflowEntrypoint<Env, Params> {
+  async run(event: WorkflowEvent<Params>, step: WorkflowStep) {
+    // steps are automatically traced
+  }
+}
+```
+
+### `traceBinding` — manual span for custom/unsupported binding ops
+
+```ts
+import { traceBinding } from "@tigorhutasuhut/telemetry-js/cloudflare";
+
+const result = await traceBinding(
+  {
+    bindingType: "my-custom-binding",
+    bindingName: "MY_BINDING",
+    operation: "process",
+    attributes: { "custom.param": "value" },
+  },
+  () => env.MY_BINDING.process(payload),
+);
+```
+
+### `bindingCaptureKeys` — PII opt-in
+
+KV keys, R2 object keys, and DO storage keys are **omitted from span attributes by default** — they may contain PII. Opt in only when safe:
+
+```ts
+instrument(handler, {
+  serviceName: "my-worker",
+  bindingCaptureKeys: true, // adds *.key attrs to spans — review PII implications first
+});
+```
+
 ## SvelteKit on Cloudflare Pages — full setup
 
 ### 1. Type `App.Platform` in `src/app.d.ts`

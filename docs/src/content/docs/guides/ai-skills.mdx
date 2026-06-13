@@ -1,0 +1,70 @@
+---
+title: AI Skills
+description: Install telemetry-js best-practice Claude skills to get accurate, runtime-aware code generation in your project.
+---
+
+## What are the best-practice skills?
+
+The telemetry-js repo ships Claude Code skills — structured markdown instructions that live in `.claude/skills/` inside your project.
+Once installed, any AI coding agent working in that project automatically follows the correct SDK patterns for your runtime (Node.js, Bun, Cloudflare Workers, or Browser) rather than guessing from generic training data.
+
+Two skills are available:
+
+- **`telemetry-js-usage`** — General best-practice rules covering `initSDK` / `instrument` usage, configuration options, span naming, exporter setup, and common pitfalls. Written for your detected runtime.
+- **`telemetry-js-cloudflare`** — Dedicated Cloudflare Workers instrumentation skill covering `instrument()` vs `traceHandler()`, `ctx.waitUntil` flush, isolate-level init, W3C Trace Context propagation, and SvelteKit-on-Pages setup.
+
+## Installing via the setup skill
+
+The quickest path is running the bundled `telemetry-js-setup` skill. It detects your project's runtime and writes both `.claude/rules` and `.claude/skills/telemetry-js-usage/` into your project.
+
+Run this command inside a Claude Code session in your project:
+
+```
+/telemetry-js-setup
+```
+
+The skill will:
+
+1. Detect your runtime (Node.js, Bun, Cloudflare Workers, or Browser).
+2. Write `.claude/rules/telemetry-js.md` with concise always-on rules.
+3. Write `.claude/skills/telemetry-js-usage/SKILL.md` with full best-practice content for your runtime.
+4. Offer to install the dedicated Cloudflare instrumentation skill if your project targets Cloudflare Workers.
+
+## Cloudflare Workers — dedicated instrumentation skill
+
+When your project targets Cloudflare Workers, the setup skill interactively offers to also write `.claude/skills/telemetry-js-cloudflare/SKILL.md`.
+
+You can also install it manually by copying the canonical source:
+
+```
+https://github.com/tigorlazuardi/telemetry-js/tree/main/skills/telemetry-js-cloudflare
+```
+
+This skill covers topics that are unique to the Workers runtime and would otherwise require an agent to read the full Cloudflare guide every session:
+
+- `instrument()` for `ExportedHandler` (`fetch`, `scheduled`, `queue`) vs `traceHandler()` for SvelteKit / Remix / Cloudflare Pages.
+- Correct import path from the published package.
+- Never using Node.js `http`/`https` modules in Workers.
+- Spans flushed automatically via `ctx.waitUntil` — no manual flush needed.
+- Initialize the SDK once per isolate, not per request.
+- W3C Trace Context (`traceparent` / `tracestate`) extracted on ingress and injected on egress automatically.
+- 5xx responses and thrown exceptions set `ERROR` span status automatically.
+
+## LLM-friendly docs sets
+
+The docs site also exposes per-runtime llms.txt files for targeted context loading:
+
+- **Full docs:** `https://tigorlazuardi.github.io/telemetry-js/llms.txt`
+- **Node.js:** `https://tigorlazuardi.github.io/telemetry-js/_llms-txt/node-usage.txt`
+- **Bun:** `https://tigorlazuardi.github.io/telemetry-js/_llms-txt/bun-usage.txt`
+- **Cloudflare Workers:** `https://tigorlazuardi.github.io/telemetry-js/_llms-txt/cloudflare-usage.txt`
+- **Browser:** `https://tigorlazuardi.github.io/telemetry-js/_llms-txt/browser-usage.txt`
+
+Use the per-runtime URL when you only need the subset relevant to your project — it loads faster and uses fewer tokens.
+
+## Skill sources on GitHub
+
+All skills ship with the package and are also browsable on GitHub:
+
+- [All skills](https://github.com/tigorlazuardi/telemetry-js/tree/main/skills)
+- [Cloudflare instrumentation skill](https://github.com/tigorlazuardi/telemetry-js/tree/main/skills/telemetry-js-cloudflare)

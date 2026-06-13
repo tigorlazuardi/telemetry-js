@@ -163,7 +163,7 @@ function resolveParentContext(parent?: Span | string, carrier?: unknown) {
  *
  * @example
  * ```ts
- * import { withTrace } from "@tigorhutasuhut/telemetry-js";
+ * import { withTrace } from "@tigorhutasuhut/telemetry-js/node";
  *
  * // Named function — span name is "fetchUser"
  * const user = await withTrace(async function fetchUser(span) {

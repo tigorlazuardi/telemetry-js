@@ -1,4 +1,5 @@
 ---
+description: Starlight docs site conventions — llms-txt whitespace settings and explicit TypeDoc prebuild pipeline.
 paths:
   - docs/astro.config.mjs
   - docs/typedoc*.json

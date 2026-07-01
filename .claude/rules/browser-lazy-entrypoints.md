@@ -1,4 +1,5 @@
 ---
+description: Browser entrypoints must keep @opentelemetry SDK code out of the eager chunk; heavy deps only behind await import().
 paths:
   - src/browser/**/*.ts
 ---

@@ -1,5 +1,5 @@
 import { spawnSync } from "child_process";
-import { readdirSync, readFileSync, statSync, writeFileSync } from "fs";
+import { readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
@@ -70,6 +70,46 @@ function injectTitles(dir) {
 }
 
 const apiOut = join(docsRoot, "src", "content", "docs", "api");
+
+// Fix collision: a bucket entrypoint literally named `index.ts` produces a
+// module folder `index/`, which clashes with the bucket's own `index.md`
+// (entryFileName). Astro then drops one of the two /api/<bucket> routes.
+// Rename the `index/` module folder to `main/` and rewrite inbound links.
+function renameIndexModules(apiDir) {
+	for (const bucket of readdirSync(apiDir)) {
+		const bucketDir = join(apiDir, bucket);
+		if (!statSync(bucketDir).isDirectory()) continue;
+		const collision = join(bucketDir, "index");
+		let exists = false;
+		try {
+			exists = statSync(collision).isDirectory();
+		} catch {}
+		if (!exists) continue;
+		renameSync(collision, join(bucketDir, "main"));
+		// Rewrite links that referenced the old `index/` module folder.
+		rewriteIndexLinks(bucketDir);
+	}
+}
+
+function rewriteIndexLinks(dir) {
+	for (const entry of readdirSync(dir)) {
+		const full = join(dir, entry);
+		if (statSync(full).isDirectory()) {
+			rewriteIndexLinks(full);
+			continue;
+		}
+		if (!entry.endsWith(".md")) continue;
+		const content = readFileSync(full, "utf8");
+		// Only rewrite the module-folder link form `index/...`, e.g.
+		// `](index/index.md)` or `](../index/functions/foo.md)`.
+		const next = content.replace(/(\]\((?:\.\.\/)*)index\//g, "$1main/");
+		if (next !== content) writeFileSync(full, next);
+	}
+}
+
+console.log("Renaming colliding `index/` module folders...");
+renameIndexModules(apiOut);
+
 console.log("Injecting title frontmatter...");
 injectTitles(apiOut);
 

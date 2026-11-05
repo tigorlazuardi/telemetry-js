@@ -16,7 +16,7 @@ Import from the subpath that matches your runtime. Each subpath only bundles the
 | `@tigorhutasuhut/telemetry-js/browser` | Browser (Vite, etc.) | Lazy facade — pure-JS eager chunk, heavy SDK loads on `initSDK()` |
 | `@tigorhutasuhut/telemetry-js/browser/fetch` | Browser | Lightweight `instrumentFetch()` only (~2 KB, zero OTel deps at import time) |
 | `@tigorhutasuhut/telemetry-js/error` | All | `AppError` class for structured application errors |
-| `@tigorhutasuhut/telemetry-js/db` | All | `withQueryName` / `getQueryName` for query naming via OTel context |
+| `@tigorhutasuhut/telemetry-js/db` | All | `withQueryName` / `getQueryName` for query naming via OTel context, `configureDb` to keep query parameters out of failed spans |
 | `@tigorhutasuhut/telemetry-js/context` | All | Go-style context: cancellation, timeouts, deadlines, values |
 
 ## Tree-shaking

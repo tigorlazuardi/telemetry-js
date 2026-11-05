@@ -29,11 +29,12 @@ vi.mock("@opentelemetry/api", async () => {
 	};
 });
 
-import { getQueryName, withQueryName } from "../src/db/index.js";
+import { configureDb, getQueryName, withQueryName } from "../src/db/index.js";
 
 describe("db", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		configureDb();
 	});
 
 	// ── getQueryName ──────────────────────────────────────────────
@@ -133,6 +134,96 @@ describe("db", () => {
 			// We verify by checking it's a context object with our value set.
 			const ctx = capturedCtx as ReturnType<typeof context.active>;
 			expect(ctx.getValue(createContextKey("telemetry-js:query-name"))).toBe("findById");
+		});
+	});
+	// ── configureDb({ redactParams }) ─────────────────────────────
+
+	describe("redactParams", () => {
+		const SECRET = "Budi Santoso";
+		const failedQuery = () => {
+			const err = new Error(`Failed query: update "t" set "name" = $1\nparams: ${SECRET},42`);
+			err.name = "DrizzleQueryError";
+			return err;
+		};
+		const everything = () =>
+			JSON.stringify([
+				mockSpan.setStatus.mock.calls,
+				mockSpan.recordException.mock.calls.map(([e]: [Error]) => ({
+					name: e.name,
+					message: e.message,
+					stack: e.stack,
+				})),
+			]);
+
+		it("is off by default: the params stay in status and exception", async () => {
+			// Fresh module instance: `beforeEach` calls configureDb(), which would hide the module default.
+			vi.resetModules();
+			const fresh = await import("../src/db/index.js");
+			const err = failedQuery();
+			await expect(fresh.withQueryName("q", () => Promise.reject(err))).rejects.toBe(err);
+			expect(everything()).toContain(SECRET);
+			expect(mockSpan.recordException).toHaveBeenCalledWith(err);
+		});
+
+		it("drops the params from status, exception message and stack (async)", async () => {
+			configureDb({ redactParams: true });
+			await expect(withQueryName("q", () => Promise.reject(failedQuery()))).rejects.toThrow();
+			expect(everything()).not.toContain(SECRET);
+			expect(mockSpan.setStatus).toHaveBeenCalledWith({
+				code: SpanStatusCode.ERROR,
+				message: 'Failed query: update "t" set "name" = $1',
+			});
+			const [recorded] = mockSpan.recordException.mock.calls[0] as [Error];
+			expect(recorded.name).toBe("DrizzleQueryError");
+			expect(recorded.message).toBe('Failed query: update "t" set "name" = $1');
+		});
+
+		it("drops the params on a sync throw too", () => {
+			configureDb({ redactParams: true });
+			expect(() =>
+				withQueryName("q", () => {
+					throw failedQuery();
+				}),
+			).toThrow();
+			expect(everything()).not.toContain(SECRET);
+		});
+
+		it("re-throws the ORIGINAL error unchanged", async () => {
+			configureDb({ redactParams: true });
+			const err = failedQuery();
+			await expect(withQueryName("q", () => Promise.reject(err))).rejects.toBe(err);
+			expect(err.message).toContain(SECRET);
+		});
+
+		it("leaves an error without a params line alone", async () => {
+			configureDb({ redactParams: true });
+			const err = new Error("connection refused");
+			await expect(withQueryName("q", () => Promise.reject(err))).rejects.toBe(err);
+			expect(mockSpan.recordException).toHaveBeenCalledWith(err);
+			expect(mockSpan.setStatus).toHaveBeenCalledWith({
+				code: SpanStatusCode.ERROR,
+				message: "connection refused",
+			});
+		});
+
+		it("handles a non-Error thrown value", () => {
+			configureDb({ redactParams: true });
+			expect(() =>
+				withQueryName("q", () => {
+					throw "string error";
+				}),
+			).toThrow("string error");
+			expect(mockSpan.setStatus).toHaveBeenCalledWith({
+				code: SpanStatusCode.ERROR,
+				message: "string error",
+			});
+		});
+
+		it("configureDb() with no argument turns it back off", async () => {
+			configureDb({ redactParams: true });
+			configureDb();
+			await expect(withQueryName("q", () => Promise.reject(failedQuery()))).rejects.toThrow();
+			expect(everything()).toContain(SECRET);
 		});
 	});
 });

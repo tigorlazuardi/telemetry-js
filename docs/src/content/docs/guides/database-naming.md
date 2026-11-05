@@ -36,3 +36,22 @@ await withTrace(async function handleRequest(span) {
   return { user, orders };
 });
 ```
+
+## Keeping query parameters out of failed spans
+
+When a query fails, `withQueryName` puts the error on its span: the message becomes the span status and `recordException` adds an event with the message and stack trace. Some drivers put the bound parameters in that message. Drizzle's is `Failed query: <sql>\nparams: <values>`, so a failed `UPDATE` exports the values you tried to write.
+
+Turn on `redactParams` once at startup to stop that:
+
+```ts
+import { configureDb } from "@tigorhutasuhut/telemetry-js/db";
+
+configureDb({ redactParams: true });
+```
+
+With it on, everything from the `params:` line onward is dropped from the span status, the exception message and the stack trace header. The SQL text, the error name and the stack frames stay, and the error you re-throw is unchanged.
+
+- **Default is `false`**, so existing behaviour does not change.
+- **Process-wide.** `configureDb` replaces the previous options; call it with no argument to turn it off again.
+- **Only this span.** A parent span that records the same error, such as `withTrace`, still records the parameters. Wrap or sanitize the error before it reaches such a span if that matters to you.
+- **Matches the `\nparams:` convention** only. A driver that puts values elsewhere in the message is not covered.

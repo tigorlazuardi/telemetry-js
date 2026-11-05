@@ -1,5 +1,6 @@
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { configureDb } from "../src/db/index.js";
 
 const { mockSpan, startActiveSpanSpy, mockExtract } = vi.hoisted(() => {
 	const span = {
@@ -299,5 +300,69 @@ describe("withTrace", () => {
 			expect(getter.get(carrier, "numericField")).toBeUndefined();
 			expect(getter.get(carrier, "nullField")).toBeUndefined();
 		});
+	});
+});
+
+describe("withTrace + configureDb({ redactParams })", () => {
+	const SECRET = "Budi Santoso";
+	const failedQuery = () => {
+		const err = new Error(`Failed query: update "t" set "name" = $1\nparams: ${SECRET},42`);
+		err.name = "DrizzleQueryError";
+		return err;
+	};
+	const recorded = () =>
+		JSON.stringify([
+			mockSpan.setStatus.mock.calls,
+			mockSpan.recordException.mock.calls.map(([e]: [Error]) => ({
+				name: e.name,
+				message: e.message,
+				stack: e.stack,
+			})),
+		]);
+
+	beforeEach(() => {
+		vi.clearAllMocks();
+		configureDb();
+	});
+
+	it("keeps the params when the option is off (default)", async () => {
+		await expect(withTrace(async () => Promise.reject(failedQuery()))).rejects.toThrow();
+		expect(recorded()).toContain(SECRET);
+	});
+
+	it("drops the params from status, exception message and stack (async)", async () => {
+		configureDb({ redactParams: true });
+		await expect(withTrace(async () => Promise.reject(failedQuery()))).rejects.toThrow();
+		expect(recorded()).not.toContain(SECRET);
+		expect(mockSpan.setStatus).toHaveBeenCalledWith({
+			code: SpanStatusCode.ERROR,
+			message: 'Failed query: update "t" set "name" = $1',
+		});
+	});
+
+	it("drops the params on a sync throw", () => {
+		configureDb({ redactParams: true });
+		expect(() =>
+			withTrace(() => {
+				throw failedQuery();
+			}),
+		).toThrow();
+		expect(recorded()).not.toContain(SECRET);
+	});
+
+	it("nested withTrace spans (parent and child) are both clean", async () => {
+		configureDb({ redactParams: true });
+		await expect(
+			withTrace(async () => withTrace(async () => Promise.reject(failedQuery()))),
+		).rejects.toThrow();
+		expect(mockSpan.recordException).toHaveBeenCalledTimes(2);
+		expect(recorded()).not.toContain(SECRET);
+	});
+
+	it("re-throws the original error unchanged", async () => {
+		configureDb({ redactParams: true });
+		const err = failedQuery();
+		await expect(withTrace(async () => Promise.reject(err))).rejects.toBe(err);
+		expect(err.message).toContain(SECRET);
 	});
 });

@@ -49,9 +49,9 @@ import { configureDb } from "@tigorhutasuhut/telemetry-js/db";
 configureDb({ redactParams: true });
 ```
 
-With it on, everything from the `params:` line onward is dropped from the span status, the exception message and the stack trace header. The SQL text, the error name and the stack frames stay, and the error you re-throw is unchanged.
+With it on, everything from the `params:` line onward is dropped from the span status, the exception message and the stack trace header, on the spans `withQueryName` **and `withTrace`** create. A failed query passes up through the `withTrace` spans around it, so both layers are covered. The SQL text, the error name and the stack frames stay, and the error you re-throw is unchanged.
 
 - **Default is `false`**, so existing behaviour does not change.
 - **Process-wide.** `configureDb` replaces the previous options; call it with no argument to turn it off again.
-- **Only this span.** A parent span that records the same error, such as `withTrace`, still records the parameters. Wrap or sanitize the error before it reaches such a span if that matters to you.
+- **Only these two span creators.** `traceHandler`, the Cloudflare bindings and workflows, the fetch instrumentation, and logger or `console` output still record the raw error message.
 - **Matches the `\nparams:` convention** only. A driver that puts values elsewhere in the message is not covered.

@@ -4,10 +4,10 @@ import {
 	ROOT_CONTEXT,
 	type Span,
 	SpanKind,
-	SpanStatusCode,
 	type TextMapGetter,
 	trace,
 } from "@opentelemetry/api";
+import { markFailed } from "./redact.js";
 import { SIGNAL_KEY } from "./signal.js";
 
 /**
@@ -208,11 +208,7 @@ export function withTrace<T>(fn: (span: Span) => T, opts?: WithTraceOptions): T 
 			try {
 				result = fn(span);
 			} catch (error) {
-				span.setStatus({
-					code: SpanStatusCode.ERROR,
-					message: error instanceof Error ? error.message : String(error),
-				});
-				span.recordException(error as Error);
+				markFailed(span, error);
 				span.end();
 				throw error;
 			}
@@ -227,11 +223,7 @@ export function withTrace<T>(fn: (span: Span) => T, opts?: WithTraceOptions): T 
 						return value;
 					},
 					(error: unknown) => {
-						span.setStatus({
-							code: SpanStatusCode.ERROR,
-							message: error instanceof Error ? error.message : String(error),
-						});
-						span.recordException(error as Error);
+						markFailed(span, error);
 						span.end();
 						throw error;
 					},

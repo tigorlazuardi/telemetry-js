@@ -16,14 +16,8 @@
  * a context manager has been registered via `initSDK`.
  */
 
-import {
-	context,
-	createContextKey,
-	type Span,
-	SpanKind,
-	SpanStatusCode,
-	trace,
-} from "@opentelemetry/api";
+import { context, createContextKey, SpanKind, trace } from "@opentelemetry/api";
+import { markFailed, setRedactParams } from "../shared/redact.js";
 
 const QUERY_NAME_KEY = createContextKey("telemetry-js:query-name");
 
@@ -39,17 +33,16 @@ export interface DbOptions {
 	 * onward is dropped from the status message, the exception message and the stack trace header.
 	 * The SQL text, the error name and the stack frames stay.
 	 *
-	 * This only covers the span `withQueryName` creates. The error still carries the parameters:
-	 * a parent span that records the same error (for example `withTrace`) will record them too.
+	 * Applies to the spans `withQueryName` and `withTrace` create. The error object itself is not
+	 * changed. `console` / logger output and other instrumented entry points (`traceHandler`,
+	 * bindings, workflows) are not covered.
 	 */
 	redactParams?: boolean;
 }
 
-let redactParams = false;
-
 /**
- * Configure `withQueryName` process-wide. Call once at startup. Calling again replaces the
- * previous options, so an omitted field returns to its default.
+ * Configure `withQueryName` and `withTrace` process-wide. Call once at startup. Calling again
+ * replaces the previous options, so an omitted field returns to its default.
  *
  * @example
  * ```ts
@@ -59,32 +52,7 @@ let redactParams = false;
  * ```
  */
 export function configureDb(opts: DbOptions = {}): void {
-	redactParams = opts.redactParams ?? false;
-}
-
-const PARAMS_MARKER = "\nparams:";
-
-function redactMessage(message: string): string {
-	const i = message.indexOf(PARAMS_MARKER);
-	return i === -1 ? message : message.slice(0, i);
-}
-
-/** What goes on the span for a failed query, honouring {@link DbOptions.redactParams}. */
-function failure(error: unknown): { message: string; exception: Error } {
-	if (!(error instanceof Error)) return { message: String(error), exception: error as Error };
-	if (!redactParams) return { message: error.message, exception: error };
-	const message = redactMessage(error.message);
-	if (message === error.message) return { message, exception: error };
-	const safe = new Error(message);
-	safe.name = error.name;
-	if (error.stack) safe.stack = error.stack.split(error.message).join(message);
-	return { message, exception: safe };
-}
-
-function markFailed(span: Span, error: unknown): void {
-	const { message, exception } = failure(error);
-	span.setStatus({ code: SpanStatusCode.ERROR, message });
-	span.recordException(exception);
+	setRedactParams(opts.redactParams ?? false);
 }
 
 /**
